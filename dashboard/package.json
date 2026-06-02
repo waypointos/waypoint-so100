@@ -1,0 +1,25 @@
+{
+  "name": "waypoint-so100-dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": { "build": "vite build", "test": "vitest run" },
+  "dependencies": {
+    "@bufbuild/protobuf": "^1.10.1",
+    "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.6.1",
+    "lucide-react": "^1.14.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "three": "^0.184.0",
+    "urdf-loader": "^0.12.7"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.6.3", "@testing-library/react": "^16.1.0",
+    "@types/node": "^22.10.2", "@types/react": "^19.0.0", "@types/react-dom": "^19.0.0",
+    "@types/three": "^0.184.1", "@vitejs/plugin-react": "^4.3.4",
+    "jsdom": "^25.0.1", "typescript": "~5.7.2", "vite": "^5.4.0",
+    "vite-plugin-css-injected-by-js": "^3.5.2", "vitest": "^2.1.8"
+  }
+}

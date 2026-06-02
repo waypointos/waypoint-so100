@@ -1,0 +1,63 @@
+syntax = "proto3";
+
+package waypoint.module.so100.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/waypoint-rover/waypoint-so100/protocol/gen/go;so100v1";
+
+// ---- tab -> backend ----
+message ArmCommand {
+  oneof action {
+    bool run_calibration = 1;  // start a full joints 1..6 calibration
+    bool abort           = 2;  // stop the running calibration, torque off
+  }
+}
+
+// ---- backend -> tab ----
+message CalibrationState {
+  google.protobuf.Timestamp t = 1;
+  string phase = 2;            // "idle" | "running" | "done" | "aborted"
+  uint32 active_joint = 3;     // joint currently seeking, 0 when idle
+  repeated JointCalibration joints = 4;
+}
+
+message JointCalibration {
+  uint32 id            = 1;
+  optional uint32 raw_min       = 2;  // N/A until measured
+  optional uint32 raw_max       = 3;
+  optional double zero_raw      = 4;
+  optional uint32 soft_min      = 5;
+  optional uint32 soft_max      = 6;
+  optional int32  measured_span = 7;
+  optional int32  expected_span = 8;
+  bool   ok          = 9;
+  string flag_reason = 10;     // "" | "seam in workspace" | "span mismatch" | "timeout"
+}
+
+// ---- wire-compatible mirror of waypoint.v1 servo.proto (Plan 1) ----
+message ServoControl {
+  uint32 servo_id = 1;
+  oneof op {
+    uint32      set_mode              = 2;
+    bool        set_torque_enable     = 3;
+    uint32      set_goal_position     = 4;
+    uint32      set_torque_limit      = 5;
+    AngleLimits set_angle_limits      = 6;
+    uint32      set_overcurrent_limit = 7;
+  }
+}
+message AngleLimits { uint32 min_raw = 1; uint32 max_raw = 2; }
+message ServoReadRequest { uint32 servo_id = 1; }
+message ServoState {
+  uint32 servo_id = 1;
+  optional uint32 position_raw  = 2;
+  optional sint32 speed_raw     = 3;
+  optional sint32 load_raw      = 4;
+  optional uint32 current_raw   = 5;
+  optional uint32 voltage_deci  = 6;
+  optional uint32 temperature_c = 7;
+  bool moving              = 8;
+  bool overcurrent_tripped = 9;
+  bool ok                  = 10;
+}

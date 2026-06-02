@@ -1,0 +1,31 @@
+name        = "so100"
+label       = "Arm"
+version     = "0.1.0"
+api_version = "1"
+language    = "go"
+entrypoint  = "waypoint-module-so100"
+requires    = ["servo-control"]
+
+[permissions]
+publish = [
+  "waypoint.*.module.so100.stats",
+  "waypoint.*.module.so100.calibration",
+  "waypoint.*.module.so100.servo.cmd",
+  "waypoint.*.module.so100.servo.read",
+]
+subscribe = [
+  "waypoint.*.module.so100.command",
+  "waypoint.*.module.so100.health.ready",
+]
+
+[hardware]
+read_write = ["/var/lib/waypoint-module-so100"]
+
+[health]
+probe      = "ready"
+interval_s = 5
+timeout_s  = 2
+
+[ui.static]
+tab_id = "m-so100"
+bundle = "/dashboard/panel.js"
