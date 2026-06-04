@@ -32,6 +32,8 @@ $(OUT): bin/waypoint-module-$(MODULE_ID)
 	cp module.toml staging/usr/share/waypoint/modules/$(MODULE_ID)/
 	cp systemd/waypoint-module-$(MODULE_ID).service staging/usr/lib/systemd/system/
 	cp dashboard/dist/panel.js staging/dashboard/panel.js
+	cp dashboard/dist/teleop.js staging/dashboard/teleop.js
+	cp -R dashboard/dist/models staging/dashboard/models
 	bash build/gen-os-release.sh $(MODULE_ID) $(VERSION) > staging/usr/lib/os-release
 	bash build/gen-extension-release.sh $(MODULE_ID) $(VERSION) > staging/usr/lib/extension-release.d/extension-release.$(MODULE_ID)
 	mksquashfs staging $(OUT) -comp zstd -no-progress -all-root

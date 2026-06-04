@@ -475,3 +475,234 @@ export class ServoState extends Message<ServoState> {
   }
 }
 
+/**
+ * Wire-compatible with waypoint.v1.GamepadSnapshot (agent mirrors raw bytes).
+ *
+ * @generated from message waypoint.module.so100.v1.GamepadSnapshot
+ */
+export class GamepadSnapshot extends Message<GamepadSnapshot> {
+  /**
+   * @generated from field: google.protobuf.Timestamp t = 1;
+   */
+  t?: Timestamp;
+
+  /**
+   * @generated from field: repeated float axes = 2;
+   */
+  axes: number[] = [];
+
+  /**
+   * @generated from field: repeated bool buttons = 3;
+   */
+  buttons: boolean[] = [];
+
+  /**
+   * @generated from field: repeated float triggers = 4;
+   */
+  triggers: number[] = [];
+
+  constructor(data?: PartialMessage<GamepadSnapshot>) {
+    super();
+    proto3.util.initPartial(data, this);
+  }
+
+  static readonly runtime: typeof proto3 = proto3;
+  static readonly typeName = "waypoint.module.so100.v1.GamepadSnapshot";
+  static readonly fields: FieldList = proto3.util.newFieldList(() => [
+    { no: 1, name: "t", kind: "message", T: Timestamp },
+    { no: 2, name: "axes", kind: "scalar", T: 2 /* ScalarType.FLOAT */, repeated: true },
+    { no: 3, name: "buttons", kind: "scalar", T: 8 /* ScalarType.BOOL */, repeated: true },
+    { no: 4, name: "triggers", kind: "scalar", T: 2 /* ScalarType.FLOAT */, repeated: true },
+  ]);
+
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): GamepadSnapshot {
+    return new GamepadSnapshot().fromBinary(bytes, options);
+  }
+
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): GamepadSnapshot {
+    return new GamepadSnapshot().fromJson(jsonValue, options);
+  }
+
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): GamepadSnapshot {
+    return new GamepadSnapshot().fromJsonString(jsonString, options);
+  }
+
+  static equals(a: GamepadSnapshot | PlainMessage<GamepadSnapshot> | undefined, b: GamepadSnapshot | PlainMessage<GamepadSnapshot> | undefined): boolean {
+    return proto3.util.equals(GamepadSnapshot, a, b);
+  }
+}
+
+/**
+ * Wire-compatible with waypoint.v1.ServoSyncWrite / ServoGoal (agent relays raw bytes).
+ *
+ * @generated from message waypoint.module.so100.v1.ServoGoal
+ */
+export class ServoGoal extends Message<ServoGoal> {
+  /**
+   * @generated from field: uint32 servo_id = 1;
+   */
+  servoId = 0;
+
+  /**
+   * @generated from field: uint32 goal_position = 2;
+   */
+  goalPosition = 0;
+
+  constructor(data?: PartialMessage<ServoGoal>) {
+    super();
+    proto3.util.initPartial(data, this);
+  }
+
+  static readonly runtime: typeof proto3 = proto3;
+  static readonly typeName = "waypoint.module.so100.v1.ServoGoal";
+  static readonly fields: FieldList = proto3.util.newFieldList(() => [
+    { no: 1, name: "servo_id", kind: "scalar", T: 13 /* ScalarType.UINT32 */ },
+    { no: 2, name: "goal_position", kind: "scalar", T: 13 /* ScalarType.UINT32 */ },
+  ]);
+
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): ServoGoal {
+    return new ServoGoal().fromBinary(bytes, options);
+  }
+
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): ServoGoal {
+    return new ServoGoal().fromJson(jsonValue, options);
+  }
+
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): ServoGoal {
+    return new ServoGoal().fromJsonString(jsonString, options);
+  }
+
+  static equals(a: ServoGoal | PlainMessage<ServoGoal> | undefined, b: ServoGoal | PlainMessage<ServoGoal> | undefined): boolean {
+    return proto3.util.equals(ServoGoal, a, b);
+  }
+}
+
+/**
+ * @generated from message waypoint.module.so100.v1.ServoSyncWrite
+ */
+export class ServoSyncWrite extends Message<ServoSyncWrite> {
+  /**
+   * @generated from field: repeated waypoint.module.so100.v1.ServoGoal goals = 1;
+   */
+  goals: ServoGoal[] = [];
+
+  constructor(data?: PartialMessage<ServoSyncWrite>) {
+    super();
+    proto3.util.initPartial(data, this);
+  }
+
+  static readonly runtime: typeof proto3 = proto3;
+  static readonly typeName = "waypoint.module.so100.v1.ServoSyncWrite";
+  static readonly fields: FieldList = proto3.util.newFieldList(() => [
+    { no: 1, name: "goals", kind: "message", T: ServoGoal, repeated: true },
+  ]);
+
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): ServoSyncWrite {
+    return new ServoSyncWrite().fromBinary(bytes, options);
+  }
+
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): ServoSyncWrite {
+    return new ServoSyncWrite().fromJson(jsonValue, options);
+  }
+
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): ServoSyncWrite {
+    return new ServoSyncWrite().fromJsonString(jsonString, options);
+  }
+
+  static equals(a: ServoSyncWrite | PlainMessage<ServoSyncWrite> | undefined, b: ServoSyncWrite | PlainMessage<ServoSyncWrite> | undefined): boolean {
+    return proto3.util.equals(ServoSyncWrite, a, b);
+  }
+}
+
+/**
+ * Module-internal: calibrated joint angles for the render window.
+ *
+ * @generated from message waypoint.module.so100.v1.Joint
+ */
+export class Joint extends Message<Joint> {
+  /**
+   * @generated from field: uint32 id = 1;
+   */
+  id = 0;
+
+  /**
+   * absent => N/A
+   *
+   * @generated from field: optional float angle_rad = 2;
+   */
+  angleRad?: number;
+
+  /**
+   * populated when angle_rad is absent
+   *
+   * @generated from field: string na_reason = 3;
+   */
+  naReason = "";
+
+  constructor(data?: PartialMessage<Joint>) {
+    super();
+    proto3.util.initPartial(data, this);
+  }
+
+  static readonly runtime: typeof proto3 = proto3;
+  static readonly typeName = "waypoint.module.so100.v1.Joint";
+  static readonly fields: FieldList = proto3.util.newFieldList(() => [
+    { no: 1, name: "id", kind: "scalar", T: 13 /* ScalarType.UINT32 */ },
+    { no: 2, name: "angle_rad", kind: "scalar", T: 2 /* ScalarType.FLOAT */, opt: true },
+    { no: 3, name: "na_reason", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+  ]);
+
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): Joint {
+    return new Joint().fromBinary(bytes, options);
+  }
+
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): Joint {
+    return new Joint().fromJson(jsonValue, options);
+  }
+
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): Joint {
+    return new Joint().fromJsonString(jsonString, options);
+  }
+
+  static equals(a: Joint | PlainMessage<Joint> | undefined, b: Joint | PlainMessage<Joint> | undefined): boolean {
+    return proto3.util.equals(Joint, a, b);
+  }
+}
+
+/**
+ * @generated from message waypoint.module.so100.v1.JointAngles
+ */
+export class JointAngles extends Message<JointAngles> {
+  /**
+   * @generated from field: repeated waypoint.module.so100.v1.Joint joints = 1;
+   */
+  joints: Joint[] = [];
+
+  constructor(data?: PartialMessage<JointAngles>) {
+    super();
+    proto3.util.initPartial(data, this);
+  }
+
+  static readonly runtime: typeof proto3 = proto3;
+  static readonly typeName = "waypoint.module.so100.v1.JointAngles";
+  static readonly fields: FieldList = proto3.util.newFieldList(() => [
+    { no: 1, name: "joints", kind: "message", T: Joint, repeated: true },
+  ]);
+
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): JointAngles {
+    return new JointAngles().fromBinary(bytes, options);
+  }
+
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): JointAngles {
+    return new JointAngles().fromJson(jsonValue, options);
+  }
+
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): JointAngles {
+    return new JointAngles().fromJsonString(jsonString, options);
+  }
+
+  static equals(a: JointAngles | PlainMessage<JointAngles> | undefined, b: JointAngles | PlainMessage<JointAngles> | undefined): boolean {
+    return proto3.util.equals(JointAngles, a, b);
+  }
+}
+

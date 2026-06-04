@@ -4,14 +4,16 @@ version     = "0.1.0"
 api_version = "1"
 language    = "go"
 entrypoint  = "waypoint-module-so100"
-requires    = ["servo-control"]
+requires    = ["servo-control", "teleop-input"]
 
 [permissions]
 publish = [
-  "waypoint.*.module.so100.stats",
-  "waypoint.*.module.so100.calibration",
   "waypoint.*.module.so100.servo.cmd",
   "waypoint.*.module.so100.servo.read",
+  "waypoint.*.module.so100.servo.sync",
+  "waypoint.*.module.so100.joints",
+  "waypoint.*.module.so100.stats",
+  "waypoint.*.module.so100.calibration",
 ]
 subscribe = [
   "waypoint.*.module.so100.command",
@@ -29,3 +31,9 @@ timeout_s  = 2
 [ui.static]
 tab_id = "m-so100"
 bundle = "/dashboard/panel.js"
+
+[ui.teleop]
+window_id = "w-so100"
+label     = "Arm"
+entry     = "teleop.js"
+bindings  = ["right_stick", "left_trigger", "right_trigger", "bumpers"]

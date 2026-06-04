@@ -61,3 +61,23 @@ message ServoState {
   bool overcurrent_tripped = 9;
   bool ok                  = 10;
 }
+
+// Wire-compatible with waypoint.v1.GamepadSnapshot (agent mirrors raw bytes).
+message GamepadSnapshot {
+  google.protobuf.Timestamp t = 1;
+  repeated float axes     = 2;
+  repeated bool  buttons  = 3;
+  repeated float triggers = 4;
+}
+
+// Wire-compatible with waypoint.v1.ServoSyncWrite / ServoGoal (agent relays raw bytes).
+message ServoGoal      { uint32 servo_id = 1; uint32 goal_position = 2; }
+message ServoSyncWrite { repeated ServoGoal goals = 1; }
+
+// Module-internal: calibrated joint angles for the render window.
+message Joint {
+  uint32 id              = 1;
+  optional float angle_rad = 2;   // absent => N/A
+  string na_reason       = 3;     // populated when angle_rad is absent
+}
+message JointAngles { repeated Joint joints = 1; }

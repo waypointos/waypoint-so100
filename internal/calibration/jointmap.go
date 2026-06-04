@@ -68,6 +68,23 @@ func (c JointCal) ThetaRad(raw uint16) float64 {
 	return (float64(raw) - c.ZeroRaw) / TicksPerRad
 }
 
+// RawFromRad is the inverse of ThetaRad, clamped to the encoder range.
+func (c JointCal) RawFromRad(rad float64) uint16 {
+	t := math.Round(c.ZeroRaw + rad*TicksPerRad)
+	if t < 0 {
+		return 0
+	}
+	if t > TicksPerRev-1 {
+		return uint16(TicksPerRev - 1)
+	}
+	return uint16(t)
+}
+
+// SoftLimitsRad returns the {lower, upper} soft limits in URDF radians.
+func (c JointCal) SoftLimitsRad() [2]float64 {
+	return [2]float64{c.ThetaRad(c.SoftMin), c.ThetaRad(c.SoftMax)}
+}
+
 func absInt(x int) int {
 	if x < 0 {
 		return -x

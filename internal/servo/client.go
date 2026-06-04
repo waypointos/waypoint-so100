@@ -18,6 +18,7 @@ type Client struct {
 	nc      *natsgo.Conn
 	cmdSubj string
 	readSub string
+	syncSub string
 }
 
 func New(nc *natsgo.Conn, roverID string) *Client {
@@ -25,7 +26,18 @@ func New(nc *natsgo.Conn, roverID string) *Client {
 		nc:      nc,
 		cmdSubj: fmt.Sprintf("waypoint.%s.module.so100.servo.cmd", roverID),
 		readSub: fmt.Sprintf("waypoint.%s.module.so100.servo.read", roverID),
+		syncSub: fmt.Sprintf("waypoint.%s.module.so100.servo.sync", roverID),
 	}
+}
+
+// SyncWriteGoals publishes one coordinated multi-servo goal write to the
+// module's own subtree; the agent relays it to core's cmd.servo_sync.
+func (c *Client) SyncWriteGoals(goals []*so100v1.ServoGoal) error {
+	body, err := proto.Marshal(&so100v1.ServoSyncWrite{Goals: goals})
+	if err != nil {
+		return err
+	}
+	return c.nc.Publish(c.syncSub, body)
 }
 
 func (c *Client) pub(ctrl *so100v1.ServoControl) error {
@@ -57,6 +69,15 @@ func (c *Client) DisableTorque(id uint32) error {
 }
 func (c *Client) SetGoalPosition(id uint32, raw uint16) error {
 	return c.pub(&so100v1.ServoControl{ServoId: id, Op: &so100v1.ServoControl_SetGoalPosition{SetGoalPosition: uint32(raw)}})
+}
+
+// ReadRaw adapts Read to jointstate.RawReader: present raw position + success.
+func (c *Client) ReadRaw(id uint32) (uint16, bool) {
+	r, err := c.Read(id)
+	if err != nil || !r.OK {
+		return 0, false
+	}
+	return r.PositionRaw, true
 }
 
 func (c *Client) Read(id uint32) (calibration.ServoReading, error) {

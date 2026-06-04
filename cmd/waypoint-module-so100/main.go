@@ -20,7 +20,10 @@ import (
 	"github.com/waypoint-rover/waypoint-so100/internal/calibration"
 	"github.com/waypoint-rover/waypoint-so100/internal/config"
 	"github.com/waypoint-rover/waypoint-so100/internal/control"
+	"github.com/waypoint-rover/waypoint-so100/internal/ik"
+	"github.com/waypoint-rover/waypoint-so100/internal/jointstate"
 	"github.com/waypoint-rover/waypoint-so100/internal/servo"
+	"github.com/waypoint-rover/waypoint-so100/internal/teleop"
 	so100v1 "github.com/waypoint-rover/waypoint-so100/protocol/gen/go"
 )
 
@@ -95,10 +98,64 @@ func main() {
 	})
 
 	// Publish the persisted calibration once at boot so the tab shows last state.
-	if cals, err := calibration.Load(cfg.StatePath); err == nil {
-		publish(cals, "idle", 0)
+	cals := map[uint32]calibration.JointCal{}
+	if loaded, err := calibration.Load(cfg.StatePath); err == nil {
+		publish(loaded, "idle", 0)
+		for _, c := range loaded {
+			cals[c.ID] = c
+		}
 	}
+
+	// Teleop: subscribe gamepad input, run the 50Hz IK control loop, and poll
+	// calibrated joint angles for the render window.
+	loop := teleop.NewLoop(teleop.LoopConfig{
+		StaleAfter: 150 * time.Millisecond,
+		MaxLinear:  0.15, MaxPitch: 1.0, RampPerTick: 0.02, Dt: 0.02,
+	}, cl, cals, ik.SO100Kinematics())
+
+	_, _ = nc.Subscribe(fmt.Sprintf("waypoint.%s.module.so100.input", *roverID), func(m *natsgo.Msg) {
+		var s so100v1.GamepadSnapshot
+		if proto.Unmarshal(m.Data, &s) != nil {
+			return
+		}
+		loop.SetInput(&s, time.Now())
+	})
+
+	stop := make(chan struct{})
+	go loop.Run(stop)
+
+	go func() {
+		t := time.NewTicker(33 * time.Millisecond)
+		defer t.Stop()
+		for {
+			select {
+			case <-stop:
+				return
+			case <-t.C:
+				ja := jointstate.BuildJointAngles([]uint32{1, 2, 3, 4, 5, 6}, cl, cals)
+				if b, err := proto.Marshal(ja); err == nil {
+					_ = nc.Publish(jointstate.PublishSubject(*roverID, "so100"), b)
+				}
+				loop.SetJointEstimate(jointEstimateFrom(ja))
+			}
+		}
+	}()
+
 	<-ctx.Done()
+	close(stop)
+}
+
+// jointEstimateFrom converts published JointAngles (ids 1..5) into the loop's
+// [5]float64 seed; an absent (N/A) angle leaves that joint at the prior value 0.
+func jointEstimateFrom(ja *so100v1.JointAngles) [5]float64 {
+	var q [5]float64
+	for _, j := range ja.GetJoints() {
+		id := j.GetId()
+		if id >= 1 && id <= 5 && j.AngleRad != nil {
+			q[id-1] = float64(j.GetAngleRad())
+		}
+	}
+	return q
 }
 
 func env(key, def string) string {

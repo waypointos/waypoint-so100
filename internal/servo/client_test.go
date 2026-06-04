@@ -44,6 +44,33 @@ func TestClient_SetGoalPositionPublishesServoControl(t *testing.T) {
 	}
 }
 
+func TestClient_SyncWriteGoals_PublishesToServoSyncSubject(t *testing.T) {
+	nc := bus(t)
+	got := make(chan []uint32, 1)
+	_, err := nc.Subscribe("waypoint.rov.module.so100.servo.sync", func(m *natsgo.Msg) {
+		var s so100v1.ServoSyncWrite
+		if proto.Unmarshal(m.Data, &s) == nil {
+			ids := []uint32{}
+			for _, g := range s.GetGoals() {
+				ids = append(ids, g.GetServoId())
+			}
+			got <- ids
+		}
+	})
+	require.NoError(t, err)
+
+	cl := New(nc, "rov")
+	require.NoError(t, cl.SyncWriteGoals([]*so100v1.ServoGoal{
+		{ServoId: 1, GoalPosition: 2048}, {ServoId: 2, GoalPosition: 1000},
+	}))
+	select {
+	case ids := <-got:
+		require.Equal(t, []uint32{1, 2}, ids)
+	case <-time.After(2 * time.Second):
+		t.Fatal("sync write not published")
+	}
+}
+
 func TestClient_ReadRequestsBroker(t *testing.T) {
 	nc := bus(t)
 	_, err := nc.Subscribe("waypoint.rov.module.so100.servo.read", func(m *natsgo.Msg) {

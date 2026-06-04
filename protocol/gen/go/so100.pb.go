@@ -661,6 +661,292 @@ func (x *ServoState) GetOk() bool {
 	return false
 }
 
+// Wire-compatible with waypoint.v1.GamepadSnapshot (agent mirrors raw bytes).
+type GamepadSnapshot struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	T        *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=t,proto3" json:"t,omitempty"`
+	Axes     []float32              `protobuf:"fixed32,2,rep,packed,name=axes,proto3" json:"axes,omitempty"`
+	Buttons  []bool                 `protobuf:"varint,3,rep,packed,name=buttons,proto3" json:"buttons,omitempty"`
+	Triggers []float32              `protobuf:"fixed32,4,rep,packed,name=triggers,proto3" json:"triggers,omitempty"`
+}
+
+func (x *GamepadSnapshot) Reset() {
+	*x = GamepadSnapshot{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_so100_proto_msgTypes[7]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *GamepadSnapshot) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GamepadSnapshot) ProtoMessage() {}
+
+func (x *GamepadSnapshot) ProtoReflect() protoreflect.Message {
+	mi := &file_so100_proto_msgTypes[7]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GamepadSnapshot.ProtoReflect.Descriptor instead.
+func (*GamepadSnapshot) Descriptor() ([]byte, []int) {
+	return file_so100_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *GamepadSnapshot) GetT() *timestamppb.Timestamp {
+	if x != nil {
+		return x.T
+	}
+	return nil
+}
+
+func (x *GamepadSnapshot) GetAxes() []float32 {
+	if x != nil {
+		return x.Axes
+	}
+	return nil
+}
+
+func (x *GamepadSnapshot) GetButtons() []bool {
+	if x != nil {
+		return x.Buttons
+	}
+	return nil
+}
+
+func (x *GamepadSnapshot) GetTriggers() []float32 {
+	if x != nil {
+		return x.Triggers
+	}
+	return nil
+}
+
+// Wire-compatible with waypoint.v1.ServoSyncWrite / ServoGoal (agent relays raw bytes).
+type ServoGoal struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	ServoId      uint32 `protobuf:"varint,1,opt,name=servo_id,json=servoId,proto3" json:"servo_id,omitempty"`
+	GoalPosition uint32 `protobuf:"varint,2,opt,name=goal_position,json=goalPosition,proto3" json:"goal_position,omitempty"`
+}
+
+func (x *ServoGoal) Reset() {
+	*x = ServoGoal{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_so100_proto_msgTypes[8]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *ServoGoal) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ServoGoal) ProtoMessage() {}
+
+func (x *ServoGoal) ProtoReflect() protoreflect.Message {
+	mi := &file_so100_proto_msgTypes[8]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ServoGoal.ProtoReflect.Descriptor instead.
+func (*ServoGoal) Descriptor() ([]byte, []int) {
+	return file_so100_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *ServoGoal) GetServoId() uint32 {
+	if x != nil {
+		return x.ServoId
+	}
+	return 0
+}
+
+func (x *ServoGoal) GetGoalPosition() uint32 {
+	if x != nil {
+		return x.GoalPosition
+	}
+	return 0
+}
+
+type ServoSyncWrite struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Goals []*ServoGoal `protobuf:"bytes,1,rep,name=goals,proto3" json:"goals,omitempty"`
+}
+
+func (x *ServoSyncWrite) Reset() {
+	*x = ServoSyncWrite{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_so100_proto_msgTypes[9]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *ServoSyncWrite) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ServoSyncWrite) ProtoMessage() {}
+
+func (x *ServoSyncWrite) ProtoReflect() protoreflect.Message {
+	mi := &file_so100_proto_msgTypes[9]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ServoSyncWrite.ProtoReflect.Descriptor instead.
+func (*ServoSyncWrite) Descriptor() ([]byte, []int) {
+	return file_so100_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *ServoSyncWrite) GetGoals() []*ServoGoal {
+	if x != nil {
+		return x.Goals
+	}
+	return nil
+}
+
+// Module-internal: calibrated joint angles for the render window.
+type Joint struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Id       uint32   `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	AngleRad *float32 `protobuf:"fixed32,2,opt,name=angle_rad,json=angleRad,proto3,oneof" json:"angle_rad,omitempty"` // absent => N/A
+	NaReason string   `protobuf:"bytes,3,opt,name=na_reason,json=naReason,proto3" json:"na_reason,omitempty"`         // populated when angle_rad is absent
+}
+
+func (x *Joint) Reset() {
+	*x = Joint{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_so100_proto_msgTypes[10]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *Joint) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Joint) ProtoMessage() {}
+
+func (x *Joint) ProtoReflect() protoreflect.Message {
+	mi := &file_so100_proto_msgTypes[10]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Joint.ProtoReflect.Descriptor instead.
+func (*Joint) Descriptor() ([]byte, []int) {
+	return file_so100_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *Joint) GetId() uint32 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *Joint) GetAngleRad() float32 {
+	if x != nil && x.AngleRad != nil {
+		return *x.AngleRad
+	}
+	return 0
+}
+
+func (x *Joint) GetNaReason() string {
+	if x != nil {
+		return x.NaReason
+	}
+	return ""
+}
+
+type JointAngles struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Joints []*Joint `protobuf:"bytes,1,rep,name=joints,proto3" json:"joints,omitempty"`
+}
+
+func (x *JointAngles) Reset() {
+	*x = JointAngles{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_so100_proto_msgTypes[11]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *JointAngles) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*JointAngles) ProtoMessage() {}
+
+func (x *JointAngles) ProtoReflect() protoreflect.Message {
+	mi := &file_so100_proto_msgTypes[11]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use JointAngles.ProtoReflect.Descriptor instead.
+func (*JointAngles) Descriptor() ([]byte, []int) {
+	return file_so100_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *JointAngles) GetJoints() []*Joint {
+	if x != nil {
+		return x.Joints
+	}
+	return nil
+}
+
 var File_so100_proto protoreflect.FileDescriptor
 
 var file_so100_proto_rawDesc = []byte{
@@ -769,7 +1055,36 @@ var file_so100_proto_rawDesc = []byte{
 	0x5f, 0x6c, 0x6f, 0x61, 0x64, 0x5f, 0x72, 0x61, 0x77, 0x42, 0x0e, 0x0a, 0x0c, 0x5f, 0x63, 0x75,
 	0x72, 0x72, 0x65, 0x6e, 0x74, 0x5f, 0x72, 0x61, 0x77, 0x42, 0x0f, 0x0a, 0x0d, 0x5f, 0x76, 0x6f,
 	0x6c, 0x74, 0x61, 0x67, 0x65, 0x5f, 0x64, 0x65, 0x63, 0x69, 0x42, 0x10, 0x0a, 0x0e, 0x5f, 0x74,
-	0x65, 0x6d, 0x70, 0x65, 0x72, 0x61, 0x74, 0x75, 0x72, 0x65, 0x5f, 0x63, 0x42, 0x42, 0x5a, 0x40,
+	0x65, 0x6d, 0x70, 0x65, 0x72, 0x61, 0x74, 0x75, 0x72, 0x65, 0x5f, 0x63, 0x22, 0x85, 0x01, 0x0a,
+	0x0f, 0x47, 0x61, 0x6d, 0x65, 0x70, 0x61, 0x64, 0x53, 0x6e, 0x61, 0x70, 0x73, 0x68, 0x6f, 0x74,
+	0x12, 0x28, 0x0a, 0x01, 0x74, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x1a, 0x2e, 0x67, 0x6f,
+	0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x54, 0x69,
+	0x6d, 0x65, 0x73, 0x74, 0x61, 0x6d, 0x70, 0x52, 0x01, 0x74, 0x12, 0x12, 0x0a, 0x04, 0x61, 0x78,
+	0x65, 0x73, 0x18, 0x02, 0x20, 0x03, 0x28, 0x02, 0x52, 0x04, 0x61, 0x78, 0x65, 0x73, 0x12, 0x18,
+	0x0a, 0x07, 0x62, 0x75, 0x74, 0x74, 0x6f, 0x6e, 0x73, 0x18, 0x03, 0x20, 0x03, 0x28, 0x08, 0x52,
+	0x07, 0x62, 0x75, 0x74, 0x74, 0x6f, 0x6e, 0x73, 0x12, 0x1a, 0x0a, 0x08, 0x74, 0x72, 0x69, 0x67,
+	0x67, 0x65, 0x72, 0x73, 0x18, 0x04, 0x20, 0x03, 0x28, 0x02, 0x52, 0x08, 0x74, 0x72, 0x69, 0x67,
+	0x67, 0x65, 0x72, 0x73, 0x22, 0x4b, 0x0a, 0x09, 0x53, 0x65, 0x72, 0x76, 0x6f, 0x47, 0x6f, 0x61,
+	0x6c, 0x12, 0x19, 0x0a, 0x08, 0x73, 0x65, 0x72, 0x76, 0x6f, 0x5f, 0x69, 0x64, 0x18, 0x01, 0x20,
+	0x01, 0x28, 0x0d, 0x52, 0x07, 0x73, 0x65, 0x72, 0x76, 0x6f, 0x49, 0x64, 0x12, 0x23, 0x0a, 0x0d,
+	0x67, 0x6f, 0x61, 0x6c, 0x5f, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x69, 0x6f, 0x6e, 0x18, 0x02, 0x20,
+	0x01, 0x28, 0x0d, 0x52, 0x0c, 0x67, 0x6f, 0x61, 0x6c, 0x50, 0x6f, 0x73, 0x69, 0x74, 0x69, 0x6f,
+	0x6e, 0x22, 0x4b, 0x0a, 0x0e, 0x53, 0x65, 0x72, 0x76, 0x6f, 0x53, 0x79, 0x6e, 0x63, 0x57, 0x72,
+	0x69, 0x74, 0x65, 0x12, 0x39, 0x0a, 0x05, 0x67, 0x6f, 0x61, 0x6c, 0x73, 0x18, 0x01, 0x20, 0x03,
+	0x28, 0x0b, 0x32, 0x23, 0x2e, 0x77, 0x61, 0x79, 0x70, 0x6f, 0x69, 0x6e, 0x74, 0x2e, 0x6d, 0x6f,
+	0x64, 0x75, 0x6c, 0x65, 0x2e, 0x73, 0x6f, 0x31, 0x30, 0x30, 0x2e, 0x76, 0x31, 0x2e, 0x53, 0x65,
+	0x72, 0x76, 0x6f, 0x47, 0x6f, 0x61, 0x6c, 0x52, 0x05, 0x67, 0x6f, 0x61, 0x6c, 0x73, 0x22, 0x64,
+	0x0a, 0x05, 0x4a, 0x6f, 0x69, 0x6e, 0x74, 0x12, 0x0e, 0x0a, 0x02, 0x69, 0x64, 0x18, 0x01, 0x20,
+	0x01, 0x28, 0x0d, 0x52, 0x02, 0x69, 0x64, 0x12, 0x20, 0x0a, 0x09, 0x61, 0x6e, 0x67, 0x6c, 0x65,
+	0x5f, 0x72, 0x61, 0x64, 0x18, 0x02, 0x20, 0x01, 0x28, 0x02, 0x48, 0x00, 0x52, 0x08, 0x61, 0x6e,
+	0x67, 0x6c, 0x65, 0x52, 0x61, 0x64, 0x88, 0x01, 0x01, 0x12, 0x1b, 0x0a, 0x09, 0x6e, 0x61, 0x5f,
+	0x72, 0x65, 0x61, 0x73, 0x6f, 0x6e, 0x18, 0x03, 0x20, 0x01, 0x28, 0x09, 0x52, 0x08, 0x6e, 0x61,
+	0x52, 0x65, 0x61, 0x73, 0x6f, 0x6e, 0x42, 0x0c, 0x0a, 0x0a, 0x5f, 0x61, 0x6e, 0x67, 0x6c, 0x65,
+	0x5f, 0x72, 0x61, 0x64, 0x22, 0x46, 0x0a, 0x0b, 0x4a, 0x6f, 0x69, 0x6e, 0x74, 0x41, 0x6e, 0x67,
+	0x6c, 0x65, 0x73, 0x12, 0x37, 0x0a, 0x06, 0x6a, 0x6f, 0x69, 0x6e, 0x74, 0x73, 0x18, 0x01, 0x20,
+	0x03, 0x28, 0x0b, 0x32, 0x1f, 0x2e, 0x77, 0x61, 0x79, 0x70, 0x6f, 0x69, 0x6e, 0x74, 0x2e, 0x6d,
+	0x6f, 0x64, 0x75, 0x6c, 0x65, 0x2e, 0x73, 0x6f, 0x31, 0x30, 0x30, 0x2e, 0x76, 0x31, 0x2e, 0x4a,
+	0x6f, 0x69, 0x6e, 0x74, 0x52, 0x06, 0x6a, 0x6f, 0x69, 0x6e, 0x74, 0x73, 0x42, 0x42, 0x5a, 0x40,
 	0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x77, 0x61, 0x79, 0x70, 0x6f,
 	0x69, 0x6e, 0x74, 0x2d, 0x72, 0x6f, 0x76, 0x65, 0x72, 0x2f, 0x77, 0x61, 0x79, 0x70, 0x6f, 0x69,
 	0x6e, 0x74, 0x2d, 0x73, 0x6f, 0x31, 0x30, 0x30, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x63, 0x6f,
@@ -789,7 +1104,7 @@ func file_so100_proto_rawDescGZIP() []byte {
 	return file_so100_proto_rawDescData
 }
 
-var file_so100_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_so100_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_so100_proto_goTypes = []any{
 	(*ArmCommand)(nil),            // 0: waypoint.module.so100.v1.ArmCommand
 	(*CalibrationState)(nil),      // 1: waypoint.module.so100.v1.CalibrationState
@@ -798,17 +1113,25 @@ var file_so100_proto_goTypes = []any{
 	(*AngleLimits)(nil),           // 4: waypoint.module.so100.v1.AngleLimits
 	(*ServoReadRequest)(nil),      // 5: waypoint.module.so100.v1.ServoReadRequest
 	(*ServoState)(nil),            // 6: waypoint.module.so100.v1.ServoState
-	(*timestamppb.Timestamp)(nil), // 7: google.protobuf.Timestamp
+	(*GamepadSnapshot)(nil),       // 7: waypoint.module.so100.v1.GamepadSnapshot
+	(*ServoGoal)(nil),             // 8: waypoint.module.so100.v1.ServoGoal
+	(*ServoSyncWrite)(nil),        // 9: waypoint.module.so100.v1.ServoSyncWrite
+	(*Joint)(nil),                 // 10: waypoint.module.so100.v1.Joint
+	(*JointAngles)(nil),           // 11: waypoint.module.so100.v1.JointAngles
+	(*timestamppb.Timestamp)(nil), // 12: google.protobuf.Timestamp
 }
 var file_so100_proto_depIdxs = []int32{
-	7, // 0: waypoint.module.so100.v1.CalibrationState.t:type_name -> google.protobuf.Timestamp
-	2, // 1: waypoint.module.so100.v1.CalibrationState.joints:type_name -> waypoint.module.so100.v1.JointCalibration
-	4, // 2: waypoint.module.so100.v1.ServoControl.set_angle_limits:type_name -> waypoint.module.so100.v1.AngleLimits
-	3, // [3:3] is the sub-list for method output_type
-	3, // [3:3] is the sub-list for method input_type
-	3, // [3:3] is the sub-list for extension type_name
-	3, // [3:3] is the sub-list for extension extendee
-	0, // [0:3] is the sub-list for field type_name
+	12, // 0: waypoint.module.so100.v1.CalibrationState.t:type_name -> google.protobuf.Timestamp
+	2,  // 1: waypoint.module.so100.v1.CalibrationState.joints:type_name -> waypoint.module.so100.v1.JointCalibration
+	4,  // 2: waypoint.module.so100.v1.ServoControl.set_angle_limits:type_name -> waypoint.module.so100.v1.AngleLimits
+	12, // 3: waypoint.module.so100.v1.GamepadSnapshot.t:type_name -> google.protobuf.Timestamp
+	8,  // 4: waypoint.module.so100.v1.ServoSyncWrite.goals:type_name -> waypoint.module.so100.v1.ServoGoal
+	10, // 5: waypoint.module.so100.v1.JointAngles.joints:type_name -> waypoint.module.so100.v1.Joint
+	6,  // [6:6] is the sub-list for method output_type
+	6,  // [6:6] is the sub-list for method input_type
+	6,  // [6:6] is the sub-list for extension type_name
+	6,  // [6:6] is the sub-list for extension extendee
+	0,  // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_so100_proto_init() }
@@ -901,6 +1224,66 @@ func file_so100_proto_init() {
 				return nil
 			}
 		}
+		file_so100_proto_msgTypes[7].Exporter = func(v any, i int) any {
+			switch v := v.(*GamepadSnapshot); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_so100_proto_msgTypes[8].Exporter = func(v any, i int) any {
+			switch v := v.(*ServoGoal); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_so100_proto_msgTypes[9].Exporter = func(v any, i int) any {
+			switch v := v.(*ServoSyncWrite); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_so100_proto_msgTypes[10].Exporter = func(v any, i int) any {
+			switch v := v.(*Joint); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_so100_proto_msgTypes[11].Exporter = func(v any, i int) any {
+			switch v := v.(*JointAngles); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
 	}
 	file_so100_proto_msgTypes[0].OneofWrappers = []any{
 		(*ArmCommand_RunCalibration)(nil),
@@ -916,13 +1299,14 @@ func file_so100_proto_init() {
 		(*ServoControl_SetOvercurrentLimit)(nil),
 	}
 	file_so100_proto_msgTypes[6].OneofWrappers = []any{}
+	file_so100_proto_msgTypes[10].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_so100_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   7,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
