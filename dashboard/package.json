@@ -4,7 +4,10 @@
   "private": true,
   "license": "Apache-2.0",
   "type": "module",
-  "scripts": { "build": "vite build", "test": "vitest run" },
+  "scripts": {
+    "build": "rm -rf dist && WAYPOINT_ENTRY=panel vite build && WAYPOINT_ENTRY=teleop vite build",
+    "test": "vitest run"
+  },
   "dependencies": {
     "@bufbuild/protobuf": "^1.10.1",
     "@react-three/drei": "^10.7.7",
