@@ -1,0 +1,50 @@
+/* dashboard/src/arm/ArmTeleop.module.css */
+
+.panel { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.main { flex: 1; min-height: 0; display: flex; }
+
+.viewport { position: relative; flex: 1; min-width: 0; background: var(--color-bg-elev-1); }
+.viewport :global(canvas) { display: block; }
+.tag {
+  position: absolute; top: 8px; left: 10px;
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--color-fg-4); pointer-events: none;
+}
+.modeRow { position: absolute; top: 8px; right: 10px; display: flex; gap: 2px; }
+.presetRow {
+  position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%);
+  display: flex; gap: 2px;
+}
+.vpBtn {
+  background: var(--color-bg-overlay); border: 1px solid var(--color-border);
+  color: var(--color-fg-3); font-family: var(--font-mono); font-size: 9px;
+  letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; cursor: pointer;
+}
+.vpBtn:hover { color: var(--color-fg-2); }
+.vpBtn[aria-pressed="true"] { color: var(--color-fg); border-color: var(--color-fg-4); }
+
+.foot {
+  flex: none; display: flex; align-items: center; gap: var(--space-lg);
+  border-top: 1px solid var(--color-border); padding: 5px var(--space-md);
+  font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.06em;
+  color: var(--color-fg-3); text-transform: uppercase;
+}
+.footSpacer { flex: 1; }
+.calWarn { color: var(--color-caution); }
+
+.feed { display: inline-flex; align-items: center; gap: 6px; }
+.feedDot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.feedLive { color: var(--color-ok); }
+.feedStale { color: var(--color-caution); }
+.feedOff { color: var(--color-fg-4); }
+
+.alpha { display: inline-flex; align-items: center; gap: 6px; color: var(--color-fg-4); }
+.alpha input[type='range'] {
+  width: 70px; height: 2px; -webkit-appearance: none; appearance: none;
+  background: var(--color-raise); outline: none;
+}
+.alpha input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 8px; height: 8px; border-radius: 0;
+  background: var(--color-fg-2); border: none;
+}
+.alphaVal { color: var(--color-fg-2); min-width: 3ch; text-align: right; }

@@ -90,7 +90,8 @@ function RobotInScene({ robot, joints, opacity }: {
 
   useEffect(() => {
     if (!robot) return;
-    applyMonochrome(robot, { base: cssVar('--color-fg-3'), accent: cssVar('--color-fg-2') });
+    // fg-2 base: legible over the window surface and over dark video alike.
+    applyMonochrome(robot, { base: cssVar('--color-fg-2'), accent: cssVar('--color-fg') });
     invalidate();
   }, [robot, invalidate]);
 

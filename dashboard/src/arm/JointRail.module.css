@@ -1,0 +1,30 @@
+/* dashboard/src/arm/JointRail.module.css */
+
+.rail {
+  width: 200px; flex: none; min-height: 0; overflow-y: auto;
+  border-left: 1px solid var(--color-border);
+  display: flex; flex-direction: column;
+}
+.head {
+  padding: 6px var(--space-md) 4px; display: flex; justify-content: space-between;
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--color-fg-4);
+}
+.row {
+  display: grid; grid-template-columns: 22px 1fr 58px; align-items: center;
+  gap: 2px var(--space-sm); padding: 5px var(--space-md) 6px;
+}
+.id { font-family: var(--font-mono); font-size: 9px; color: var(--color-fg-4); letter-spacing: 0.06em; }
+.name { font-size: 11px; color: var(--color-fg-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.val {
+  font-family: var(--font-mono); font-size: 12.5px; text-align: right;
+  color: var(--color-fg); font-variant-numeric: tabular-nums; white-space: pre;
+}
+.hot { color: var(--color-caution); }
+.na { font-family: var(--font-mono); font-size: 11px; text-align: right; color: var(--color-fg-4); }
+.reason { grid-column: 2 / 4; font-size: 9.5px; color: var(--color-fg-4); }
+
+.bar { grid-column: 2 / 4; position: relative; height: 3px; background: var(--color-raise); }
+.zero { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--color-fg-4); opacity: 0.6; }
+.mark { position: absolute; top: -2px; width: 1.5px; height: 7px; background: var(--color-fg-2); }
+.markHot { background: var(--color-caution); }
