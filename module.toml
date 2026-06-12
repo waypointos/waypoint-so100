@@ -6,6 +6,10 @@ language    = "go"
 entrypoint  = "waypoint-module-so100"
 requires    = ["servo-control", "teleop-input"]
 
+[component]
+class = "arm"
+state_rate_hz = 30
+
 [permissions]
 publish = [
   "waypoint.*.module.so100.servo.cmd",

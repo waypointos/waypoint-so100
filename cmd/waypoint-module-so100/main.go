@@ -1,67 +1,82 @@
 package main
 
 import (
-	"bufio"
 	"context"
-	"flag"
-	"fmt"
 	"log/slog"
 	"os"
-	"os/signal"
-	"strings"
-	"syscall"
 	"time"
 
-	"github.com/coreos/go-systemd/v22/daemon"
 	natsgo "github.com/nats-io/nats.go"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	waypointv1 "github.com/waypoint-rover/waypoint/protocol/gen/go/messages"
+	"github.com/waypoint-rover/waypoint/sdk/wpmodule"
+
+	"github.com/waypoint-rover/waypoint-so100/internal/armserver"
 	"github.com/waypoint-rover/waypoint-so100/internal/calibration"
 	"github.com/waypoint-rover/waypoint-so100/internal/config"
 	"github.com/waypoint-rover/waypoint-so100/internal/control"
 	"github.com/waypoint-rover/waypoint-so100/internal/ik"
 	"github.com/waypoint-rover/waypoint-so100/internal/jointstate"
-	"github.com/waypoint-rover/waypoint-so100/internal/servo"
+	"github.com/waypoint-rover/waypoint-so100/internal/servobus"
 	"github.com/waypoint-rover/waypoint-so100/internal/teleop"
 	so100v1 "github.com/waypoint-rover/waypoint-so100/protocol/gen/go"
 )
 
 func main() {
-	configPath := flag.String("config", env("WAYPOINT_MODULE_CONFIG", ""), "path to config.toml")
-	credsPath := flag.String("creds", env("WAYPOINT_MODULE_CREDS", ""), "path to creds.env")
-	natsURL := flag.String("nats", env("WAYPOINT_NATS_URL", natsgo.DefaultURL), "nats URL")
-	roverID := flag.String("rover", env("WAYPOINT_ROVER_ID", ""), "rover id")
-	flag.Parse()
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, nil)))
-	if *credsPath == "" || *roverID == "" {
-		slog.Error("waypoint-module-so100: --creds and --rover are required")
-		os.Exit(2)
-	}
-	cfg, err := config.Load(*configPath)
+	err := wpmodule.Run(context.Background(), wpmodule.Options{ID: "so100"}, setup)
 	if err != nil {
-		slog.Error(fmt.Sprintf("config: %v", err))
+		slog.Error(err.Error())
 		os.Exit(1)
 	}
-	user, pass, err := loadCredsEnv(*credsPath)
-	if err != nil {
-		slog.Error(fmt.Sprintf("creds: %v", err))
-		os.Exit(1)
-	}
-	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer cancel()
-	nc, err := natsgo.Connect(*natsURL, natsgo.UserInfo(user, pass), natsgo.MaxReconnects(-1), natsgo.ReconnectWait(2*time.Second))
-	if err != nil {
-		slog.Error(fmt.Sprintf("nats connect: %v", err))
-		os.Exit(1)
-	}
-	defer nc.Close()
-	_, _ = daemon.SdNotify(false, daemon.SdNotifyReady)
+}
 
-	calSubject := fmt.Sprintf("waypoint.%s.module.so100.calibration", *roverID)
-	publish := func(cals []calibration.JointCal, phase string, active uint32) {
+// setup wires the so100 module on the SDK runtime. The SDK owns connect, creds,
+// sd_notify, health, and stats; this recreates the module's own surfaces:
+// calibration, the private command, teleop, the joints publisher, and the
+// standard arm component. Goroutines started here stop on m.Done(), before
+// the SDK drains the connection.
+func setup(m *wpmodule.M) error {
+	cfg, err := config.Load(os.Getenv("WAYPOINT_MODULE_CONFIG"))
+	if err != nil {
+		return err
+	}
+
+	svc := m.Servo()
+	sv := servobus.New(svc)
+
+	cals := map[uint32]calibration.JointCal{}
+
+	// Joint name + order from the SO-101 design (ids 1..6).
+	names := map[uint32]string{}
+	order := make([]uint32, 0, len(calibration.SO100Joints))
+	for _, spec := range calibration.SO100Joints {
+		names[spec.ID] = spec.Name
+		order = append(order, spec.ID)
+	}
+	// Reader bridges the so100 raw width; writer is the SDK client's native
+	// waypoint.v1 goal path.
+	armSrv := armserver.New(sv, svc, cals, names, order)
+
+	// applyCals refreshes the live calibration view shared by the joints
+	// publisher and teleop loop, and the arm server's own snapshot.
+	applyCals := func(loaded []calibration.JointCal) {
+		next := map[uint32]calibration.JointCal{}
+		for _, c := range loaded {
+			next[c.ID] = c
+			cals[c.ID] = c
+		}
+		armSrv.SetCalibration(next)
+	}
+
+	// Calibration progress publisher keeps its private subject; on "done" it
+	// persists and refreshes the live calibration.
+	calSubject := m.Subject("calibration")
+	publish := func(progress []calibration.JointCal, phase string, active uint32) {
 		st := &so100v1.CalibrationState{T: timestamppb.Now(), Phase: phase, ActiveJoint: active}
-		for _, c := range cals {
+		for _, c := range progress {
 			jc := &so100v1.JointCalibration{
 				Id: c.ID, Ok: c.OK,
 				RawMin: proto.Uint32(uint32(c.RawMin)), RawMax: proto.Uint32(uint32(c.RawMax)),
@@ -72,77 +87,78 @@ func main() {
 			st.Joints = append(st.Joints, jc)
 		}
 		body, _ := proto.Marshal(st)
-		_ = nc.Publish(calSubject, body)
+		_ = m.Publish(calSubject, body)
 		if phase == "done" {
-			_ = calibration.Save(cfg.StatePath, cals)
+			_ = calibration.Save(cfg.StatePath, progress)
+			applyCals(progress)
 		}
 	}
 
-	cl := servo.New(nc, *roverID)
-	ctrl := control.New(cl, publish)
+	ctrl := control.New(sv, publish)
 
-	// Health responder.
-	_, _ = nc.Subscribe(fmt.Sprintf("waypoint.%s.module.so100.health.ready", *roverID), func(m *natsgo.Msg) {
-		_ = m.Respond([]byte("ok"))
-	})
-	// Command handler: run / abort calibration. Calibration runs in a goroutine
-	// so the subscription callback returns promptly.
-	_, _ = nc.Subscribe(fmt.Sprintf("waypoint.%s.module.so100.command", *roverID), func(m *natsgo.Msg) {
+	// Private command handler: run calibration in a goroutine so the callback
+	// returns promptly. Coexists with the standard arm.cmd the SDK serves.
+	if _, err := m.Subscribe(m.Subject("command"), func(msg *natsgo.Msg) {
 		var cmd so100v1.ArmCommand
-		if proto.Unmarshal(m.Data, &cmd) != nil {
+		if proto.Unmarshal(msg.Data, &cmd) != nil {
 			return
 		}
 		if cmd.GetRunCalibration() {
 			go ctrl.RunCalibration()
 		}
-	})
-
-	// Publish the persisted calibration once at boot so the tab shows last state.
-	cals := map[uint32]calibration.JointCal{}
-	if loaded, err := calibration.Load(cfg.StatePath); err == nil {
-		publish(loaded, "idle", 0)
-		for _, c := range loaded {
-			cals[c.ID] = c
-		}
+	}); err != nil {
+		return err
 	}
 
-	// Teleop: subscribe gamepad input, run the 50Hz IK control loop, and poll
-	// calibrated joint angles for the render window.
+	// Publish persisted calibration once at boot so the tab shows last state.
+	if loaded, err := calibration.Load(cfg.StatePath); err == nil {
+		publish(loaded, "idle", 0)
+		applyCals(loaded)
+	}
+
+	// Teleop: the SDK relays the gamepad stream; convert it to the so100 wire
+	// shape (identical fields) for the IK loop.
 	loop := teleop.NewLoop(teleop.LoopConfig{
 		StaleAfter: 150 * time.Millisecond,
 		MaxLinear:  0.15, MaxPitch: 1.0, RampPerTick: 0.02, Dt: 0.02,
-	}, cl, cals, ik.SO100Kinematics())
+	}, sv, cals, ik.SO100Kinematics())
 
-	_, _ = nc.Subscribe(fmt.Sprintf("waypoint.%s.module.so100.input", *roverID), func(m *natsgo.Msg) {
-		var s so100v1.GamepadSnapshot
-		if proto.Unmarshal(m.Data, &s) != nil {
-			return
-		}
-		loop.SetInput(&s, time.Now())
-	})
+	if _, err := m.TeleopInput(func(s *waypointv1.GamepadSnapshot) {
+		loop.SetInput(&so100v1.GamepadSnapshot{
+			Axes: s.GetAxes(), Buttons: s.GetButtons(), Triggers: s.GetTriggers(),
+		}, time.Now())
+	}); err != nil {
+		return err
+	}
 
-	stop := make(chan struct{})
-	go loop.Run(stop)
+	// Standard arm component API (floor over the same servo path). A standard
+	// stop must freeze teleop motion too, not just re-latch goals.
+	armSrv.SetHalt(loop.Halt)
+	if _, err := m.ServeArm(armSrv); err != nil {
+		return err
+	}
 
+	go loop.Run(m.Done())
+
+	// 33 ms joint-angle publisher feeds the private joints subject (panel).
 	go func() {
 		t := time.NewTicker(33 * time.Millisecond)
 		defer t.Stop()
 		for {
 			select {
-			case <-stop:
+			case <-m.Done():
 				return
 			case <-t.C:
-				ja := jointstate.BuildJointAngles([]uint32{1, 2, 3, 4, 5, 6}, cl, cals)
+				ja := jointstate.BuildJointAngles([]uint32{1, 2, 3, 4, 5, 6}, sv, cals)
 				if b, err := proto.Marshal(ja); err == nil {
-					_ = nc.Publish(jointstate.PublishSubject(*roverID, "so100"), b)
+					_ = m.Publish(m.Subject("joints"), b)
 				}
 				loop.SetJointEstimate(jointEstimateFrom(ja))
 			}
 		}
 	}()
 
-	<-ctx.Done()
-	close(stop)
+	return nil
 }
 
 // jointEstimateFrom converts published JointAngles (ids 1..5) into the loop's
@@ -156,41 +172,4 @@ func jointEstimateFrom(ja *so100v1.JointAngles) [5]float64 {
 		}
 	}
 	return q
-}
-
-func env(key, def string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return def
-}
-
-func loadCredsEnv(path string) (string, string, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return "", "", err
-	}
-	defer f.Close()
-	var user, pass string
-	sc := bufio.NewScanner(f)
-	for sc.Scan() {
-		line := strings.TrimSpace(sc.Text())
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		k, v, ok := strings.Cut(line, "=")
-		if !ok {
-			continue
-		}
-		switch k {
-		case "WAYPOINT_NATS_USER":
-			user = v
-		case "WAYPOINT_NATS_PASSWORD":
-			pass = v
-		}
-	}
-	if user == "" || pass == "" {
-		return "", "", fmt.Errorf("creds: missing user or password")
-	}
-	return user, pass, nil
 }

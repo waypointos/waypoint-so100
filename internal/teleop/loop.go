@@ -34,7 +34,8 @@ type Loop struct {
 	last      *so100v1.GamepadSnapshot
 	lastAt    time.Time
 	q         [5]float64 // current joint estimate (rad)
-	prevTwist ik.Twist
+	halted    bool
+	prevTwist ik.Twist // owned by the tick goroutine
 }
 
 func NewLoop(cfg LoopConfig, sink Sink, cals map[uint32]calibration.JointCal, k ik.Kinematics) *Loop {
@@ -47,6 +48,17 @@ func NewLoop(cfg LoopConfig, sink Sink, cals map[uint32]calibration.JointCal, k 
 func (l *Loop) SetInput(s *so100v1.GamepadSnapshot, at time.Time) {
 	l.mu.Lock()
 	l.last, l.lastAt = s, at
+	l.halted = false // fresh operator input resumes a halted loop
+	l.mu.Unlock()
+}
+
+// Halt drops the current input and suppresses ticks until fresh input
+// arrives, so an ArmCommand stop freezes motion immediately; servos hold
+// their last written goal.
+func (l *Loop) Halt() {
+	l.mu.Lock()
+	l.last = nil
+	l.halted = true
 	l.mu.Unlock()
 }
 
@@ -69,8 +81,13 @@ func (l *Loop) calibrated() bool {
 
 func (l *Loop) tick(now time.Time) {
 	l.mu.Lock()
-	snap, at, q := l.last, l.lastAt, l.q
+	snap, at, q, halted := l.last, l.lastAt, l.q, l.halted
 	l.mu.Unlock()
+
+	if halted {
+		l.prevTwist = ik.Twist{} // discard ramp state so resume starts from rest
+		return
+	}
 
 	// Failsafe 5: refuse to move uncalibrated.
 	if !l.calibrated() {
