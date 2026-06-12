@@ -1,4 +1,4 @@
-module github.com/waypoint-rover/waypoint-so100
+module github.com/waypointos/waypoint-so100
 
 go 1.25.0
 
@@ -6,16 +6,16 @@ require (
 	github.com/BurntSushi/toml v1.6.0
 	github.com/nats-io/nats.go v1.52.0
 	github.com/stretchr/testify v1.11.1
-	github.com/waypoint-rover/waypoint/protocol/gen/go v0.0.0
-	github.com/waypoint-rover/waypoint/sdk v0.0.0
+	github.com/waypointos/waypoint/protocol/gen/go v0.0.0
+	github.com/waypointos/waypoint/sdk v0.0.0
 	google.golang.org/protobuf v1.36.11
 )
 
-replace github.com/waypoint-rover/waypoint/sdk => ../waypoint/sdk
+replace github.com/waypointos/waypoint/sdk => ../waypoint/sdk
 
-replace github.com/waypoint-rover/waypoint/protocol/gen/go => ../waypoint/protocol/gen/go
+replace github.com/waypointos/waypoint/protocol/gen/go => ../waypoint/protocol/gen/go
 
-replace github.com/waypoint-rover/waypoint/protocol/platform => ../waypoint/protocol/platform
+replace github.com/waypointos/waypoint/protocol/platform => ../waypoint/protocol/platform
 
 require (
 	github.com/coreos/go-systemd/v22 v22.7.0 // indirect
@@ -24,7 +24,7 @@ require (
 	github.com/nats-io/nkeys v0.4.16 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/waypoint-rover/waypoint/protocol/platform v0.0.0-00010101000000-000000000000 // indirect
+	github.com/waypointos/waypoint/protocol/platform v0.0.0-00010101000000-000000000000 // indirect
 	golang.org/x/crypto v0.52.0 // indirect
 	golang.org/x/sys v0.46.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect

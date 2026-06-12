@@ -4,7 +4,7 @@ package waypoint.module.so100.v1;
 
 import "google/protobuf/timestamp.proto";
 
-option go_package = "github.com/waypoint-rover/waypoint-so100/protocol/gen/go;so100v1";
+option go_package = "github.com/waypointos/waypoint-so100/protocol/gen/go;so100v1";
 
 // ---- tab -> backend ----
 message ArmCommand {

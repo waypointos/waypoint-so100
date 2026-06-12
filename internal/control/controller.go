@@ -2,7 +2,7 @@
 package control
 
 import (
-	"github.com/waypoint-rover/waypoint-so100/internal/calibration"
+	"github.com/waypointos/waypoint-so100/internal/calibration"
 )
 
 // Publish reports calibration progress (the controller stays transport-agnostic;

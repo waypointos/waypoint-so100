@@ -5,11 +5,11 @@
 package servobus
 
 import (
-	waypointv1 "github.com/waypoint-rover/waypoint/protocol/gen/go/messages"
-	"github.com/waypoint-rover/waypoint/sdk/wpmodule"
+	waypointv1 "github.com/waypointos/waypoint/protocol/gen/go/messages"
+	"github.com/waypointos/waypoint/sdk/wpmodule"
 
-	"github.com/waypoint-rover/waypoint-so100/internal/calibration"
-	so100v1 "github.com/waypoint-rover/waypoint-so100/protocol/gen/go"
+	"github.com/waypointos/waypoint-so100/internal/calibration"
+	so100v1 "github.com/waypointos/waypoint-so100/protocol/gen/go"
 )
 
 // Adapter wraps the SDK servo client behind the so100 module's interfaces.

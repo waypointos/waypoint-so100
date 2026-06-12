@@ -5,9 +5,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	waypointv1 "github.com/waypoint-rover/waypoint/protocol/gen/go/messages"
+	waypointv1 "github.com/waypointos/waypoint/protocol/gen/go/messages"
 
-	"github.com/waypoint-rover/waypoint-so100/internal/calibration"
+	"github.com/waypointos/waypoint-so100/internal/calibration"
 )
 
 type fakeReader struct {

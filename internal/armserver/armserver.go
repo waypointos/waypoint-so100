@@ -6,9 +6,9 @@ package armserver
 import (
 	"sync"
 
-	waypointv1 "github.com/waypoint-rover/waypoint/protocol/gen/go/messages"
+	waypointv1 "github.com/waypointos/waypoint/protocol/gen/go/messages"
 
-	"github.com/waypoint-rover/waypoint-so100/internal/calibration"
+	"github.com/waypointos/waypoint-so100/internal/calibration"
 )
 
 // RawReader returns a servo's present raw position and whether the read succeeded.

@@ -1,7 +1,7 @@
 # waypoint-module-so100
 
 The SO-101 arm as a Waypoint no-rebuild module. Built on the Waypoint module
-SDK (`github.com/waypoint-rover/waypoint/sdk`): the SDK owns connect, creds,
+SDK (`github.com/waypointos/waypoint/sdk`): the SDK owns connect, creds,
 sd_notify, health, and stats; this repo provides the arm's own logic
 (calibration, IK teleop, the joints publisher) and serves the standard
 waypoint.v1 arm component API.

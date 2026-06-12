@@ -1,8 +1,8 @@
 package teleop
 
 import (
-	so100v1 "github.com/waypoint-rover/waypoint-so100/protocol/gen/go"
-	"github.com/waypoint-rover/waypoint-so100/internal/ik"
+	so100v1 "github.com/waypointos/waypoint-so100/protocol/gen/go"
+	"github.com/waypointos/waypoint-so100/internal/ik"
 )
 
 type MapConfig struct {

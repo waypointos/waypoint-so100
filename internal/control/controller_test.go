@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/waypoint-rover/waypoint-so100/internal/calibration"
+	"github.com/waypointos/waypoint-so100/internal/calibration"
 )
 
 // scriptedClient presses symmetric stops for every joint so a full run completes.

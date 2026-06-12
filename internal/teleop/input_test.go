@@ -3,7 +3,7 @@ package teleop
 import (
 	"testing"
 
-	so100v1 "github.com/waypoint-rover/waypoint-so100/protocol/gen/go"
+	so100v1 "github.com/waypointos/waypoint-so100/protocol/gen/go"
 )
 
 func TestMapInput_RightStickToPlanarXY(t *testing.T) {

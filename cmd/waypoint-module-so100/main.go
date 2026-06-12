@@ -10,18 +10,18 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	waypointv1 "github.com/waypoint-rover/waypoint/protocol/gen/go/messages"
-	"github.com/waypoint-rover/waypoint/sdk/wpmodule"
+	waypointv1 "github.com/waypointos/waypoint/protocol/gen/go/messages"
+	"github.com/waypointos/waypoint/sdk/wpmodule"
 
-	"github.com/waypoint-rover/waypoint-so100/internal/armserver"
-	"github.com/waypoint-rover/waypoint-so100/internal/calibration"
-	"github.com/waypoint-rover/waypoint-so100/internal/config"
-	"github.com/waypoint-rover/waypoint-so100/internal/control"
-	"github.com/waypoint-rover/waypoint-so100/internal/ik"
-	"github.com/waypoint-rover/waypoint-so100/internal/jointstate"
-	"github.com/waypoint-rover/waypoint-so100/internal/servobus"
-	"github.com/waypoint-rover/waypoint-so100/internal/teleop"
-	so100v1 "github.com/waypoint-rover/waypoint-so100/protocol/gen/go"
+	"github.com/waypointos/waypoint-so100/internal/armserver"
+	"github.com/waypointos/waypoint-so100/internal/calibration"
+	"github.com/waypointos/waypoint-so100/internal/config"
+	"github.com/waypointos/waypoint-so100/internal/control"
+	"github.com/waypointos/waypoint-so100/internal/ik"
+	"github.com/waypointos/waypoint-so100/internal/jointstate"
+	"github.com/waypointos/waypoint-so100/internal/servobus"
+	"github.com/waypointos/waypoint-so100/internal/teleop"
+	so100v1 "github.com/waypointos/waypoint-so100/protocol/gen/go"
 )
 
 func main() {

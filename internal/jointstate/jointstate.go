@@ -5,8 +5,8 @@ package jointstate
 import (
 	"fmt"
 
-	so100v1 "github.com/waypoint-rover/waypoint-so100/protocol/gen/go"
-	"github.com/waypoint-rover/waypoint-so100/internal/calibration"
+	so100v1 "github.com/waypointos/waypoint-so100/protocol/gen/go"
+	"github.com/waypointos/waypoint-so100/internal/calibration"
 )
 
 // RawReader returns a servo's present raw position (0..4095) and whether the
