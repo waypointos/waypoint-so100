@@ -26,7 +26,10 @@ $(OUT): bin/waypoint-module-$(MODULE_ID)
 # Minimal rootfs skeleton: a portable RootImage runs in a mount namespace, and
 # systemd binds the host's /dev,/proc,/sys (+ /tmp,/var/tmp for PrivateTmp) onto
 # these mount points. Without them the unit fails at step NAMESPACE (status 226).
-	mkdir -p staging/dev staging/proc staging/sys staging/run staging/tmp staging/var/tmp staging/etc staging/root
+# var/lib/waypoint-module-so100 is the BindPaths= destination for the module's
+# [hardware] read_write state dir; the agent backs it with a writable /data dir,
+# but the mount point must exist in this read-only rootfs for the bind to land.
+	mkdir -p staging/dev staging/proc staging/sys staging/run staging/tmp staging/var/tmp staging/etc staging/root staging/var/lib/waypoint-module-so100
 	touch staging/etc/machine-id staging/etc/resolv.conf
 	cp bin/waypoint-module-$(MODULE_ID) staging/usr/bin/
 	cp module.toml staging/usr/share/waypoint/modules/$(MODULE_ID)/

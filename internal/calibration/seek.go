@@ -28,6 +28,7 @@ type SeekConfig struct {
 	PlateauReads   int    // consecutive non-advancing reads to declare a stop
 	MaxTravelTicks int    // abort if traveled this far without a stop
 	SeamJumpTicks  int    // a position jump this large means the encoder seam is in the path
+	StopAtCap      bool   // treat reaching MaxTravelTicks as a valid stop (a fenced, stopless joint) rather than a timeout
 }
 
 type SeekReason int
@@ -94,6 +95,9 @@ func SeekHardStop(c ServoClient, id uint32, cfg SeekConfig) SeekResult {
 		traveled += absInt(cur - last)
 		last = cur
 		if traveled > cfg.MaxTravelTicks {
+			if cfg.StopAtCap {
+				return SeekResult{RawStop: r.PositionRaw, Reason: SeekOK}
+			}
 			return SeekResult{Reason: SeekTimeout}
 		}
 	}
