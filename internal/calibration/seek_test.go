@@ -20,6 +20,7 @@ func (p *fakePlant) SetMode(uint32, uint32) error                { return nil }
 func (p *fakePlant) SetTorqueLimit(uint32, uint16) error         { return nil }
 func (p *fakePlant) SetOvercurrentLimit(uint32, uint16) error    { return nil }
 func (p *fakePlant) SetAngleLimits(uint32, uint16, uint16) error { return nil }
+func (p *fakePlant) SetGoalSpeed(uint32, uint16) error           { return nil }
 func (p *fakePlant) EnableTorque(uint32) error                   { return nil }
 func (p *fakePlant) DisableTorque(uint32) error                  { return nil }
 func (p *fakePlant) SetGoalPosition(_ uint32, raw uint16) error  { p.lastGoal = raw; return nil }
@@ -40,8 +41,9 @@ func (p *fakePlant) Read(uint32) (ServoReading, error) {
 
 func defaultSeekCfg(dir int) SeekConfig {
 	return SeekConfig{
-		Direction: dir, StepTicks: 30, CurrentLimit: 500,
-		ProgressTicks: 5, PlateauReads: 3, MaxTravelTicks: 4096, SeamJumpTicks: 1000,
+		Direction: dir, StepTicks: 30, MovingSpeed: 200, CurrentLimit: 500,
+		FollowErrorTicks: 80, ProgressTicks: 5, PlateauReads: 3,
+		MaxTravelTicks: 4096, SeamJumpTicks: 1000,
 	}
 }
 

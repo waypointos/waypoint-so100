@@ -6,34 +6,58 @@ import "fmt"
 // conservative; tune on hardware.
 type CalibrateConfig struct {
 	TorqueLimit     uint16
+	JointTorque     map[uint32]uint16 // per-joint torque override; falls back to TorqueLimit
 	OvercurrentRaw  uint16
 	SpanTolerance   int
 	SeekMarginTicks int // travel allowed beyond a joint's URDF span before the seek aborts
-	NoStopCapTicks  int // hard travel fence each way from center for stopless joints (wrist roll)
+	NoStopCapTicks  int // soft-limit half-window each way from center for stopless joints (wrist roll)
 	Seek            SeekConfig
+}
+
+// TorqueFor returns the seek torque cap for a joint, honoring a per-joint
+// override. The shoulder joints are capped lower so that, if the seek ever drives
+// the arm into the chassis or the ground, the servo cannot generate enough force
+// to lift the rover (which masks the stop) before the seek detects the block.
+func (c CalibrateConfig) TorqueFor(id uint32) uint16 {
+	if t, ok := c.JointTorque[id]; ok {
+		return t
+	}
+	return c.TorqueLimit
 }
 
 func DefaultCalibrateConfig() CalibrateConfig {
 	return CalibrateConfig{
-		TorqueLimit:     400,
+		TorqueLimit: 350,
+		// Shoulder pan/lift bear the whole arm; keep their seek torque low so a
+		// misaimed seek binds and is detected instead of lifting the rover.
+		JointTorque:     map[uint32]uint16{1: 250, 2: 250},
 		OvercurrentRaw:  600,
 		SpanTolerance:   60,
-		SeekMarginTicks: 200,  // ~18 deg of overshoot to reach and press the stop
-		NoStopCapTicks:  1024, // 90 deg; wrist roll has no stop and must not snag the camera cable
+		SeekMarginTicks: 200, // ~18 deg of overshoot to reach and press the stop
+		// 512 ticks = 45 deg each way = a 90 deg total window. Wrist roll has no
+		// hard stop; it is fenced here and, crucially, is NEVER power-seeked, so
+		// the camera cable is never wound past this window.
+		NoStopCapTicks: 512,
 		Seek: SeekConfig{
-			StepTicks: 20, CurrentLimit: 500, ProgressTicks: 4,
+			StepTicks: 20, MovingSpeed: 200, CurrentLimit: 350,
+			FollowErrorTicks: 80, ProgressTicks: 4,
 			PlateauReads: 3, SeamJumpTicks: 1000,
 			// MaxTravelTicks is set per joint in CalibrateJoint from its real range.
 		},
 	}
 }
 
-// CalibrateJoint runs the full safe sequence for one joint and returns its
-// derived calibration. Torque is always left OFF on return. A jointed limb
-// (HasHardStop) seeks both mechanical stops, bounded to its URDF range plus a
-// small margin so a missed stop aborts at the joint's range instead of driving
-// a full revolution into the floor. A stopless joint (wrist roll) is fenced to
-// a window around its centered start so the seek cannot snag the camera cable.
+// CalibrateJoint runs the safe sequence for one joint and returns its derived
+// calibration. Torque is always left OFF on return.
+//
+// A jointed limb (HasHardStop) seeks both mechanical stops, bounded to its URDF
+// range plus a small margin so a missed stop aborts at the joint's range instead
+// of driving a full revolution into the floor.
+//
+// A stopless joint (wrist roll) has no stop to find, so seeking it would only
+// wind the gripper-camera cable for nothing. It is NOT powered or moved: we set
+// the servo's hardware angle-limit fence and derive soft limits straight from its
+// resting center, leaving the cable untouched.
 func CalibrateJoint(c ServoClient, spec JointSpec, cfg CalibrateConfig) (JointCal, error) {
 	const modePosition = 0
 	if err := c.SetMode(spec.ID, modePosition); err != nil {
@@ -46,18 +70,14 @@ func CalibrateJoint(c ServoClient, spec JointSpec, cfg CalibrateConfig) (JointCa
 	}
 	center := int(start.PositionRaw)
 
-	// Jointed limbs open to the full encoder range; a stopless joint is fenced in
-	// the servo itself to +/- NoStopCapTicks of center, a hardware backstop that
-	// holds even if the seek logic is wrong.
-	loLimit, hiLimit := uint16(0), uint16(4095)
 	if !spec.HasHardStop {
-		loLimit = clampTick(center - cfg.NoStopCapTicks)
-		hiLimit = clampTick(center + cfg.NoStopCapTicks)
+		return centerStoplessJoint(c, spec, cfg, center)
 	}
-	if err := c.SetAngleLimits(spec.ID, loLimit, hiLimit); err != nil {
+
+	if err := c.SetAngleLimits(spec.ID, 0, 4095); err != nil { // open the full range for the seek
 		return JointCal{}, fmt.Errorf("angle limits: %w", err)
 	}
-	if err := c.SetTorqueLimit(spec.ID, cfg.TorqueLimit); err != nil {
+	if err := c.SetTorqueLimit(spec.ID, cfg.TorqueFor(spec.ID)); err != nil {
 		return JointCal{}, fmt.Errorf("torque limit: %w", err)
 	}
 	if err := c.SetOvercurrentLimit(spec.ID, cfg.OvercurrentRaw); err != nil {
@@ -68,10 +88,21 @@ func CalibrateJoint(c ServoClient, spec JointSpec, cfg CalibrateConfig) (JointCa
 	}
 	defer c.DisableTorque(spec.ID) //nolint:errcheck
 
-	if spec.HasHardStop {
-		return seekBothStops(c, spec, cfg)
+	return seekBothStops(c, spec, cfg)
+}
+
+// centerStoplessJoint calibrates a joint with no hard stop (wrist roll) without
+// moving it. The resting position is the zero; the soft limits are a fixed
+// +/- NoStopCapTicks window around it, and the same window is written to the
+// servo's hardware angle limits as a backstop. No torque is enabled, so the
+// gripper-camera cable is never wound during calibration.
+func centerStoplessJoint(c ServoClient, spec JointSpec, cfg CalibrateConfig, center int) (JointCal, error) {
+	lo := clampTick(center - cfg.NoStopCapTicks)
+	hi := clampTick(center + cfg.NoStopCapTicks)
+	if err := c.SetAngleLimits(spec.ID, lo, hi); err != nil {
+		return JointCal{}, fmt.Errorf("angle limits: %w", err)
 	}
-	return seekFencedWindow(c, spec, cfg, center)
+	return DeriveCentered(spec, uint16(center), lo, hi), nil
 }
 
 // seekBothStops ramps to the upper then lower mechanical stop, bounding each
@@ -99,36 +130,6 @@ func seekBothStops(c ServoClient, spec JointSpec, cfg CalibrateConfig) (JointCal
 		rawMin, rawMax = rawMax, rawMin
 	}
 	return Derive(spec, rawMin, rawMax, cfg.SpanTolerance), nil
-}
-
-// seekFencedWindow probes a stopless joint within +/- NoStopCapTicks of its
-// centered start. Reaching the fence is a valid limit (StopAtCap); a real stop
-// found earlier is used instead. The descent budget is sized so the total
-// excursion stays within the fence regardless of where the ascent stopped.
-func seekFencedWindow(c ServoClient, spec JointSpec, cfg CalibrateConfig, center int) (JointCal, error) {
-	up := cfg.Seek
-	up.Direction = +1
-	up.MaxTravelTicks = cfg.NoStopCapTicks
-	up.StopAtCap = true
-	upRes := SeekHardStop(c, spec.ID, up)
-	if upRes.Reason != SeekOK {
-		return JointCal{ID: spec.ID}, seekErr("up", upRes.Reason)
-	}
-
-	down := cfg.Seek
-	down.Direction = -1
-	down.MaxTravelTicks = (int(upRes.RawStop) - center) + cfg.NoStopCapTicks
-	down.StopAtCap = true
-	downRes := SeekHardStop(c, spec.ID, down)
-	if downRes.Reason != SeekOK {
-		return JointCal{ID: spec.ID}, seekErr("down", downRes.Reason)
-	}
-
-	rawMin, rawMax := downRes.RawStop, upRes.RawStop
-	if rawMin > rawMax {
-		rawMin, rawMax = rawMax, rawMin
-	}
-	return DeriveCentered(spec, uint16(center), rawMin, rawMax), nil
 }
 
 func clampTick(t int) uint16 {

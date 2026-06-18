@@ -16,6 +16,7 @@ func (s *scriptedClient) SetMode(uint32, uint32) error                { return n
 func (s *scriptedClient) SetTorqueLimit(uint32, uint16) error         { return nil }
 func (s *scriptedClient) SetOvercurrentLimit(uint32, uint16) error    { return nil }
 func (s *scriptedClient) SetAngleLimits(uint32, uint16, uint16) error { return nil }
+func (s *scriptedClient) SetGoalSpeed(uint32, uint16) error           { return nil }
 func (s *scriptedClient) EnableTorque(uint32) error                   { return nil }
 func (s *scriptedClient) DisableTorque(uint32) error                  { return nil }
 func (s *scriptedClient) SetGoalPosition(id uint32, raw uint16) error { s.lastGoal[id] = raw; return nil }

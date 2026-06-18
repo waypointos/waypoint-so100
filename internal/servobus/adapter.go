@@ -27,6 +27,9 @@ func (a *Adapter) SetOvercurrentLimit(id uint32, raw uint16) error {
 func (a *Adapter) SetAngleLimits(id uint32, min, max uint16) error {
 	return a.sv.SetAngleLimits(id, uint32(min), uint32(max))
 }
+func (a *Adapter) SetGoalSpeed(id uint32, raw uint16) error {
+	return a.sv.SetGoalSpeed(id, uint32(raw))
+}
 func (a *Adapter) EnableTorque(id uint32) error  { return a.sv.SetTorqueEnable(id, true) }
 func (a *Adapter) DisableTorque(id uint32) error { return a.sv.SetTorqueEnable(id, false) }
 func (a *Adapter) SetGoalPosition(id uint32, raw uint16) error {
