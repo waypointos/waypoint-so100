@@ -17,7 +17,7 @@ export class ArmCommand extends Message<ArmCommand> {
    */
   action: {
     /**
-     * start a full joints 1..6 calibration
+     * start a manual range-recording session (torque off, operator sweeps each joint)
      *
      * @generated from field: bool run_calibration = 1;
      */
@@ -25,12 +25,20 @@ export class ArmCommand extends Message<ArmCommand> {
     case: "runCalibration";
   } | {
     /**
-     * stop the running calibration, torque off
+     * stop the running session, discard, torque off
      *
      * @generated from field: bool abort = 2;
      */
     value: boolean;
     case: "abort";
+  } | {
+    /**
+     * stop recording, derive + save from the swept ranges
+     *
+     * @generated from field: bool finish_calibration = 3;
+     */
+    value: boolean;
+    case: "finishCalibration";
   } | { case: undefined; value?: undefined } = { case: undefined };
 
   constructor(data?: PartialMessage<ArmCommand>) {
@@ -43,6 +51,7 @@ export class ArmCommand extends Message<ArmCommand> {
   static readonly fields: FieldList = proto3.util.newFieldList(() => [
     { no: 1, name: "run_calibration", kind: "scalar", T: 8 /* ScalarType.BOOL */, oneof: "action" },
     { no: 2, name: "abort", kind: "scalar", T: 8 /* ScalarType.BOOL */, oneof: "action" },
+    { no: 3, name: "finish_calibration", kind: "scalar", T: 8 /* ScalarType.BOOL */, oneof: "action" },
   ]);
 
   static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): ArmCommand {
@@ -74,14 +83,14 @@ export class CalibrationState extends Message<CalibrationState> {
   t?: Timestamp;
 
   /**
-   * "idle" | "running" | "done" | "aborted"
+   * "idle" | "recording" | "done" | "aborted"
    *
    * @generated from field: string phase = 2;
    */
   phase = "";
 
   /**
-   * joint currently seeking, 0 when idle
+   * unused in manual recording (kept for wire compat), 0
    *
    * @generated from field: uint32 active_joint = 3;
    */

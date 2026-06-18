@@ -12,10 +12,10 @@ function renderWithBridge(publish = vi.fn()) {
 }
 
 describe('CalibratePanel', () => {
-  it('publishes run_calibration to the module command subject', () => {
+  it('publishes a command on the module command subject when starting', () => {
     const publish = vi.fn();
     renderWithBridge(publish);
-    fireEvent.click(screen.getByRole('button', { name: /run calibration/i }));
+    fireEvent.click(screen.getByRole('button', { name: /start calibration/i }));
     expect(publish).toHaveBeenCalledWith(
       'waypoint.r1.module.so100.command',
       expect.any(Uint8Array),

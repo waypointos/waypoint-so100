@@ -18,9 +18,9 @@ const SoftLimitMarginTicks = 20
 // JointSpec is a fixed property of the SO-101 design. LowerRad is phi.
 //
 // HasHardStop is false for joints that can spin freely past their URDF limits
-// (wrist roll): they have no mechanical stop to seek, so calibration fences them
-// to a window around their centered start instead of ramping into a "stop" that
-// does not exist.
+// (wrist roll): they have no mechanical stop to record against, so calibration
+// fences them to a fixed window around their resting center instead of measuring
+// a "stop" that does not exist.
 type JointSpec struct {
 	ID          uint32
 	Name        string
@@ -50,6 +50,7 @@ type JointCal struct {
 	MeasuredSpan int     `toml:"measured_span"`
 	ExpectedSpan int     `toml:"expected_span"`
 	OK           bool    `toml:"ok"`
+	FlagReason   string  `toml:"flag_reason,omitempty"` // "" when OK; else why (e.g. "span mismatch", "seam in workspace")
 }
 
 // ExpectedSpanTicks is the joint's full URDF travel in encoder ticks.
@@ -61,6 +62,11 @@ func ExpectedSpanTicks(spec JointSpec) int {
 func Derive(spec JointSpec, rawMin, rawMax uint16, spanTolerance int) JointCal {
 	measured := int(rawMax) - int(rawMin)
 	expected := ExpectedSpanTicks(spec)
+	ok := absInt(measured-expected) <= spanTolerance
+	flag := ""
+	if !ok {
+		flag = "span mismatch"
+	}
 	return JointCal{
 		ID:           spec.ID,
 		RawMin:       rawMin,
@@ -70,13 +76,14 @@ func Derive(spec JointSpec, rawMin, rawMax uint16, spanTolerance int) JointCal {
 		SoftMax:      rawMax - SoftLimitMarginTicks,
 		MeasuredSpan: measured,
 		ExpectedSpan: expected,
-		OK:           absInt(measured-expected) <= spanTolerance,
+		OK:           ok,
+		FlagReason:   flag,
 	}
 }
 
 // DeriveCentered builds the calibration for a stopless joint (wrist roll). Its
-// neutral resting pose is the zero, and the window comes from the fenced seek
-// rather than two hard stops, so there is no span to validate: OK is always true.
+// neutral resting pose is the zero, and the window is a fixed fence rather than
+// two measured hard stops, so there is no span to validate: OK is always true.
 func DeriveCentered(spec JointSpec, centerRaw, rawMin, rawMax uint16) JointCal {
 	if rawMin > rawMax {
 		rawMin, rawMax = rawMax, rawMin

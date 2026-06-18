@@ -9,16 +9,17 @@ option go_package = "github.com/waypointos/waypoint-so100/protocol/gen/go;so100v
 // ---- tab -> backend ----
 message ArmCommand {
   oneof action {
-    bool run_calibration = 1;  // start a full joints 1..6 calibration
-    bool abort           = 2;  // stop the running calibration, torque off
+    bool run_calibration    = 1;  // start a manual range-recording session (torque off, operator sweeps each joint)
+    bool abort              = 2;  // stop the running session, discard, torque off
+    bool finish_calibration = 3;  // stop recording, derive + save from the swept ranges
   }
 }
 
 // ---- backend -> tab ----
 message CalibrationState {
   google.protobuf.Timestamp t = 1;
-  string phase = 2;            // "idle" | "running" | "done" | "aborted"
-  uint32 active_joint = 3;     // joint currently seeking, 0 when idle
+  string phase = 2;            // "idle" | "recording" | "done" | "aborted"
+  uint32 active_joint = 3;     // unused in manual recording (kept for wire compat), 0
   repeated JointCalibration joints = 4;
 }
 

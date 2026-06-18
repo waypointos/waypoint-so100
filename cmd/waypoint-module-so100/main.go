@@ -78,7 +78,7 @@ func setup(m *wpmodule.M) error {
 		st := &so100v1.CalibrationState{T: timestamppb.Now(), Phase: phase, ActiveJoint: active}
 		for _, c := range progress {
 			jc := &so100v1.JointCalibration{
-				Id: c.ID, Ok: c.OK,
+				Id: c.ID, Ok: c.OK, FlagReason: c.FlagReason,
 				RawMin: proto.Uint32(uint32(c.RawMin)), RawMax: proto.Uint32(uint32(c.RawMax)),
 				ZeroRaw: proto.Float64(c.ZeroRaw),
 				SoftMin: proto.Uint32(uint32(c.SoftMin)), SoftMax: proto.Uint32(uint32(c.SoftMax)),
@@ -103,8 +103,13 @@ func setup(m *wpmodule.M) error {
 		if proto.Unmarshal(msg.Data, &cmd) != nil {
 			return
 		}
-		if cmd.GetRunCalibration() {
-			go ctrl.RunCalibration()
+		switch {
+		case cmd.GetRunCalibration():
+			ctrl.StartRecording()
+		case cmd.GetFinishCalibration():
+			ctrl.FinishRecording()
+		case cmd.GetAbort():
+			ctrl.Abort()
 		}
 	}); err != nil {
 		return err
