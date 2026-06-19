@@ -6,6 +6,7 @@ package control
 
 import (
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/waypointos/waypoint-so100/internal/calibration"
@@ -23,9 +24,15 @@ type Controller struct {
 	sample   time.Duration // how often to poll servo positions while recording
 	pubEvery time.Duration // how often to publish the live range to the tab
 
-	mu  sync.Mutex
-	rec *session // non-nil while a recording session is live
+	mu        sync.Mutex
+	rec       *session    // non-nil while a recording session is live
+	recording atomic.Bool // true while a session reads the servo bus
 }
+
+// Recording reports whether a calibration session is actively polling the servo
+// bus, so other readers (the joint-angle publisher) can yield the bus and avoid
+// read contention that starves the long wrist/gripper chain.
+func (c *Controller) Recording() bool { return c.recording.Load() }
 
 type session struct {
 	finish chan bool // true => derive + save, false => abort
@@ -54,6 +61,7 @@ func (c *Controller) StartRecording() {
 	sess := &session{finish: make(chan bool, 1)}
 	c.rec = sess
 	c.mu.Unlock()
+	c.recording.Store(true)
 
 	for _, spec := range calibration.SO100Joints {
 		_ = c.client.DisableTorque(spec.ID)
@@ -83,6 +91,7 @@ func (c *Controller) signal(save bool) {
 }
 
 func (c *Controller) record(sess *session) {
+	defer c.recording.Store(false)
 	rec := calibration.NewRecorder(calibration.SO100Joints)
 	sampleT := time.NewTicker(c.sample)
 	pubT := time.NewTicker(c.pubEvery)

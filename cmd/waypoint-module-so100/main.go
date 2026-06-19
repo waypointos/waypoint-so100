@@ -89,8 +89,17 @@ func setup(m *wpmodule.M) error {
 		body, _ := proto.Marshal(st)
 		_ = m.Publish(calSubject, body)
 		if phase == "done" {
-			_ = calibration.Save(cfg.StatePath, progress)
-			applyCals(progress)
+			// Persist and apply only joints that produced a usable map; a joint
+			// that failed (no read / seam) must stay uncalibrated rather than
+			// poison teleop with a garbage zero anchor.
+			mapped := make([]calibration.JointCal, 0, len(progress))
+			for _, c := range progress {
+				if c.Mapped() {
+					mapped = append(mapped, c)
+				}
+			}
+			_ = calibration.Save(cfg.StatePath, mapped)
+			applyCals(mapped)
 		}
 	}
 
@@ -154,6 +163,12 @@ func setup(m *wpmodule.M) error {
 			case <-m.Done():
 				return
 			case <-t.C:
+				// Yield the servo bus to the calibration recorder while it is
+				// sweeping; two readers at ~30 Hz starve the long wrist/gripper
+				// chain and surface as "no read".
+				if ctrl.Recording() {
+					continue
+				}
 				ja := jointstate.BuildJointAngles([]uint32{1, 2, 3, 4, 5, 6}, sv, cals)
 				if b, err := proto.Marshal(ja); err == nil {
 					_ = m.Publish(m.Subject("joints"), b)

@@ -15,6 +15,16 @@ var TicksPerRad = TicksPerRev / (2 * math.Pi)
 // SoftLimitMarginTicks backs the soft limits off the measured hard stops.
 const SoftLimitMarginTicks = 20
 
+// Flag reasons recorded on a JointCal. Empty means a clean calibration.
+// FlagSpanMismatch still carries a usable map (the measured span just differs
+// from the URDF span — usually an incomplete sweep); FlagNoRead and FlagSeam do
+// NOT carry a map and must not be applied (see Mapped).
+const (
+	FlagSpanMismatch = "span mismatch"
+	FlagNoRead       = "no read"
+	FlagSeam         = "seam in workspace"
+)
+
 // JointSpec is a fixed property of the SO-101 design. LowerRad is phi.
 //
 // HasHardStop is false for joints that can spin freely past their URDF limits
@@ -65,7 +75,7 @@ func Derive(spec JointSpec, rawMin, rawMax uint16, spanTolerance int) JointCal {
 	ok := absInt(measured-expected) <= spanTolerance
 	flag := ""
 	if !ok {
-		flag = "span mismatch"
+		flag = FlagSpanMismatch
 	}
 	return JointCal{
 		ID:           spec.ID,
@@ -99,6 +109,14 @@ func DeriveCentered(spec JointSpec, centerRaw, rawMin, rawMax uint16) JointCal {
 		ExpectedSpan: ExpectedSpanTicks(spec),
 		OK:           true,
 	}
+}
+
+// Mapped reports whether this calibration carries a usable raw->rad map. A
+// joint that could not be measured (never read, or whose range straddles the
+// encoder seam) has no valid zero, so it must stay uncalibrated rather than be
+// applied with a garbage anchor that teleop would then drive against.
+func (c JointCal) Mapped() bool {
+	return c.FlagReason != FlagNoRead && c.FlagReason != FlagSeam
 }
 
 // ThetaRad maps a raw tick to a URDF joint angle using the derived zero.

@@ -112,4 +112,12 @@ func TestRecorder_UnreadJointIsFlagged(t *testing.T) {
 	cal := rec.Results(DefaultRecordConfig())[0]
 	require.False(t, cal.OK)
 	require.Equal(t, "no read", cal.FlagReason)
+	require.False(t, cal.Mapped(), "unread joint has no usable map and must not be applied")
+}
+
+func TestMapped_DistinguishesUsableCalibrations(t *testing.T) {
+	require.True(t, JointCal{}.Mapped(), "clean calibration is usable")
+	require.True(t, JointCal{FlagReason: FlagSpanMismatch}.Mapped(), "span mismatch still carries a map")
+	require.False(t, JointCal{FlagReason: FlagNoRead}.Mapped())
+	require.False(t, JointCal{FlagReason: FlagSeam}.Mapped())
 }

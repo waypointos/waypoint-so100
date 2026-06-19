@@ -67,6 +67,7 @@ func TestRecording_DisablesTorqueDerivesAndReports(t *testing.T) {
 	ctrl.pubEvery = 500 * time.Microsecond
 
 	ctrl.StartRecording()
+	require.True(t, ctrl.Recording(), "bus must read as in-use while recording")
 	// Torque must be cut on every joint so the operator can move the arm.
 	require.GreaterOrEqual(t, client.torqueOff.Load(), int64(len(calibration.SO100Joints)))
 
@@ -80,6 +81,9 @@ func TestRecording_DisablesTorqueDerivesAndReports(t *testing.T) {
 		defer mu.Unlock()
 		return done != nil
 	}, time.Second, time.Millisecond)
+
+	require.Eventually(t, func() bool { return !ctrl.Recording() }, time.Second, time.Millisecond,
+		"bus must be released after the session ends")
 
 	mu.Lock()
 	defer mu.Unlock()

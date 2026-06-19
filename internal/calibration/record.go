@@ -106,7 +106,7 @@ func (r *Recorder) Results(cfg RecordConfig) []JointCal {
 func (r *Recorder) result(s JointSpec, cfg RecordConfig) JointCal {
 	t := r.tr[s.ID]
 	if !t.started {
-		return JointCal{ID: s.ID, FlagReason: "no read"}
+		return JointCal{ID: s.ID, FlagReason: FlagNoRead}
 	}
 
 	if !s.HasHardStop {
@@ -118,7 +118,7 @@ func (r *Recorder) result(s JointSpec, cfg RecordConfig) JointCal {
 	trueSpan := t.contMax - t.contMin
 	directSpan := absInt(int(t.rawAtMax) - int(t.rawAtMin))
 	if math.Abs(trueSpan-float64(directSpan)) > SeamSlackTicks {
-		return JointCal{ID: s.ID, FlagReason: "seam in workspace"}
+		return JointCal{ID: s.ID, FlagReason: FlagSeam}
 	}
 	lo, hi := orderRaw(t.rawAtMin, t.rawAtMax)
 	return Derive(s, lo, hi, cfg.SpanTolerance)
