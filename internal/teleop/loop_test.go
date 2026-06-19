@@ -163,6 +163,38 @@ func TestLoop_WristRollClampedToSoftLimit(t *testing.T) {
 	}
 }
 
+// While actively teleoperating, the lagging sensor must NOT overwrite the
+// integrated reference (jitter/creep guard).
+func TestLoop_SeedIgnoredWhileActive(t *testing.T) {
+	s := &recSink{}
+	l := newTestLoop(s)
+	now := time.Now()
+	l.SetInput(&so100v1.GamepadSnapshot{Axes: []float32{0, 0, 0.5, 0}}, now) // fresh -> active
+	l.SetJointEstimate([5]float64{1, 1, 1, 1, 1})
+	l.SetGripEstimate(1)
+	if l.q[0] != 0 || l.grip != 0 {
+		t.Fatalf("active teleop must ignore sensor reseed; got q=%v grip=%v", l.q, l.grip)
+	}
+}
+
+// When idle (no input, halted, or stale), the sensor seeds the reference so a
+// fresh move starts from the true pose.
+func TestLoop_SeedAppliedWhenIdle(t *testing.T) {
+	s := &recSink{}
+	l := newTestLoop(s) // no input yet -> idle
+	l.SetJointEstimate([5]float64{1, 1, 1, 1, 1})
+	l.SetGripEstimate(2)
+	if l.q[0] != 1 || l.grip != 2 {
+		t.Fatalf("idle loop must accept sensor reseed; got q=%v grip=%v", l.q, l.grip)
+	}
+	// Stale input is also idle.
+	l.SetInput(&so100v1.GamepadSnapshot{Axes: []float32{0, 0, 0.5, 0}}, time.Now().Add(-time.Second))
+	l.SetJointEstimate([5]float64{3, 3, 3, 3, 3})
+	if l.q[0] != 3 {
+		t.Fatalf("stale input is idle; reseed must apply; got q=%v", l.q)
+	}
+}
+
 // An uncalibrated gripper is skipped while the IK joints still move.
 func TestLoop_UncalibratedGripperSkipsJoint6(t *testing.T) {
 	s := &recSink{}

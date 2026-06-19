@@ -141,7 +141,9 @@ func setup(m *wpmodule.M) error {
 	// shape (identical fields) for the IK loop.
 	loop := teleop.NewLoop(teleop.LoopConfig{
 		StaleAfter: 150 * time.Millisecond,
-		MaxLinear:  0.15, MaxPitch: 1.0, MaxRoll: 1.0, MaxGrip: 1.5, RampPerTick: 0.02, Dt: 0.02,
+		// Rates are tune-on-hardware; opened up from the initial conservative set
+		// once the reference-reseed jitter (SetJointEstimate gating) was fixed.
+		MaxLinear: 0.25, MaxPitch: 1.5, MaxRoll: 1.5, MaxGrip: 2.0, RampPerTick: 0.04, Dt: 0.02,
 	}, sv, cals, ik.SO100Kinematics())
 
 	if _, err := m.TeleopInput(func(s *waypointv1.GamepadSnapshot) {

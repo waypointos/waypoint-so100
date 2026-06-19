@@ -66,20 +66,39 @@ func (l *Loop) Halt() {
 }
 
 // SetJointEstimate seeds the current joint angles (from jointstate) so IK
-// integrates from the real pose.
+// integrates from the real pose. Ignored while teleop is actively commanding
+// (see seedAllowedLocked): during motion the integrated q is the reference of
+// record, and overwriting it with the lagging encoder read every cycle fights
+// the integrator — the source of teleop jitter and sluggish creep.
 func (l *Loop) SetJointEstimate(q [5]float64) {
 	l.mu.Lock()
-	l.q = q
+	if l.seedAllowedLocked() {
+		l.q = q
+	}
 	l.mu.Unlock()
 }
 
 // SetGripEstimate seeds the gripper angle (joint 6, from jointstate) so the
 // hold-to-move gripper integrates from the real position. Joint 6 is outside
-// the IK chain, so it is tracked separately from q.
+// the IK chain, so it is tracked separately from q. Gated like SetJointEstimate.
 func (l *Loop) SetGripEstimate(rad float64) {
 	l.mu.Lock()
-	l.grip = rad
+	if l.seedAllowedLocked() {
+		l.grip = rad
+	}
 	l.mu.Unlock()
+}
+
+// seedAllowedLocked reports whether the sensor may overwrite the integrated
+// reference. Only while teleop is idle — halted, no input yet, or input gone
+// stale — so a fresh move always starts from the true measured pose, but an
+// in-flight move integrates its own reference without sensor fight. Caller
+// holds l.mu.
+func (l *Loop) seedAllowedLocked() bool {
+	if l.halted || l.last == nil {
+		return true
+	}
+	return time.Since(l.lastAt) > l.cfg.StaleAfter
 }
 
 func (l *Loop) calibrated() bool {
