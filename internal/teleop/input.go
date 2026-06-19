@@ -35,11 +35,13 @@ func btn(b []bool, i int) float64 {
 func MapInput(s *so100v1.GamepadSnapshot, cfg MapConfig) Command {
 	rx, ry := axis(s.GetAxes(), 2), axis(s.GetAxes(), 3)
 	lt, rt := axis(s.GetTriggers(), 0), axis(s.GetTriggers(), 1)
-	// bumpers LB=4, RB=5 ; roll on buttons 2/3 ; gripper buttons 0/1
+	// The IK base frame has Vx lateral and Vy forward, so the right stick is
+	// wired to the operator's view: horizontal = pan/lateral (Vx), vertical =
+	// reach (Vy). bumpers LB=4, RB=5 ; roll on buttons 2/3 ; gripper buttons 0/1
 	return Command{
 		Twist: ik.Twist{
-			Vx:     -ry * cfg.LinearScale, // stick up = forward
-			Vy:     rx * cfg.LinearScale,
+			Vx:     rx * cfg.LinearScale,  // stick right = pan/lateral
+			Vy:     -ry * cfg.LinearScale, // stick up = forward/reach
 			Vz:     (rt - lt) * cfg.VerticalScale, // RT up, LT down
 			Wpitch: (btn(s.GetButtons(), 5) - btn(s.GetButtons(), 4)) * cfg.PitchScale,
 		},
