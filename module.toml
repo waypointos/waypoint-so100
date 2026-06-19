@@ -40,4 +40,4 @@ bundle = "/dashboard/panel.js"
 window_id = "w-so100"
 label     = "Arm"
 entry     = "teleop.js"
-bindings  = ["right_stick", "left_trigger", "right_trigger", "bumpers"]
+bindings  = ["right_stick", "left_trigger", "right_trigger", "bumpers", "buttons"]

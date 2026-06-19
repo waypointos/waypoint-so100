@@ -141,7 +141,7 @@ func setup(m *wpmodule.M) error {
 	// shape (identical fields) for the IK loop.
 	loop := teleop.NewLoop(teleop.LoopConfig{
 		StaleAfter: 150 * time.Millisecond,
-		MaxLinear:  0.15, MaxPitch: 1.0, RampPerTick: 0.02, Dt: 0.02,
+		MaxLinear:  0.15, MaxPitch: 1.0, MaxRoll: 1.0, MaxGrip: 1.5, RampPerTick: 0.02, Dt: 0.02,
 	}, sv, cals, ik.SO100Kinematics())
 
 	if _, err := m.TeleopInput(func(s *waypointv1.GamepadSnapshot) {
@@ -181,6 +181,9 @@ func setup(m *wpmodule.M) error {
 					_ = m.Publish(m.Subject("joints"), b)
 				}
 				loop.SetJointEstimate(jointEstimateFrom(ja))
+				if g, ok := gripEstimateFrom(ja); ok {
+					loop.SetGripEstimate(g)
+				}
 			}
 		}
 	}()
@@ -223,4 +226,16 @@ func jointEstimateFrom(ja *so100v1.JointAngles) [5]float64 {
 		}
 	}
 	return q
+}
+
+// gripEstimateFrom pulls the gripper (joint 6) angle from published JointAngles
+// to seed the teleop loop's hold-to-move gripper. ok is false when joint 6 is
+// N/A, leaving the prior estimate untouched.
+func gripEstimateFrom(ja *so100v1.JointAngles) (float64, bool) {
+	for _, j := range ja.GetJoints() {
+		if j.GetId() == 6 && j.AngleRad != nil {
+			return float64(j.GetAngleRad()), true
+		}
+	}
+	return 0, false
 }
