@@ -55,10 +55,14 @@ func TestRecording_DisablesTorqueDerivesAndReports(t *testing.T) {
 		done   []calibration.JointCal
 		phases []string
 	)
-	ctrl := New(client, func(cals []calibration.JointCal, phase string, _ uint32) {
+	var homeSeen bool
+	ctrl := New(client, func(cals []calibration.JointCal, phase string, hs bool) {
 		mu.Lock()
 		defer mu.Unlock()
 		phases = append(phases, phase)
+		if hs {
+			homeSeen = true
+		}
 		if phase == "done" {
 			done = append([]calibration.JointCal{}, cals...)
 		}
@@ -71,8 +75,15 @@ func TestRecording_DisablesTorqueDerivesAndReports(t *testing.T) {
 	// Torque must be cut on every joint so the operator can move the arm.
 	require.GreaterOrEqual(t, client.torqueOff.Load(), int64(len(calibration.SO100Joints)))
 
-	// Let the sweep be sampled enough to capture both extremes per joint.
-	require.Eventually(t, func() bool { return client.reads.Load() > 200 },
+	// Capture a home pose, then keep sweeping to capture both extremes per joint.
+	require.Eventually(t, func() bool { return client.reads.Load() > 50 }, time.Second, time.Millisecond)
+	ctrl.SetHome()
+	require.Eventually(t, func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return homeSeen
+	}, time.Second, time.Millisecond, "home_set must propagate while recording")
+	require.Eventually(t, func() bool { return client.reads.Load() > 400 },
 		time.Second, time.Millisecond)
 
 	ctrl.FinishRecording()
@@ -89,14 +100,17 @@ func TestRecording_DisablesTorqueDerivesAndReports(t *testing.T) {
 	defer mu.Unlock()
 	require.Len(t, done, len(calibration.SO100Joints))
 	require.Contains(t, phases, "recording")
-	// Every joint was read and swept, so none should be "no read".
+	// All joints read, homed, and swept a full 1000..3000 span -> all clean.
 	for _, c := range done {
-		require.NotEqual(t, "no read", c.FlagReason)
+		require.True(t, c.OK, "joint %d should be OK, got %q", c.ID, c.FlagReason)
 	}
+	// Clean joints get their soft limits fenced into the servos.
+	require.GreaterOrEqual(t, client.fences.Load(), int64(len(calibration.SO100Joints)))
 }
 
 func TestFinishWithoutSession_IsNoop(t *testing.T) {
-	ctrl := New(newSweep(), func([]calibration.JointCal, string, uint32) {})
+	ctrl := New(newSweep(), func([]calibration.JointCal, string, bool) {})
 	ctrl.FinishRecording() // must not panic or block
 	ctrl.Abort()
+	ctrl.SetHome()
 }

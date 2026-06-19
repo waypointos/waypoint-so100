@@ -19,7 +19,7 @@ func fixedCalibration() map[uint32]calibration.JointCal {
 	out := map[uint32]calibration.JointCal{}
 	for _, id := range []uint32{1, 2, 3, 4, 5, 6} {
 		spec := calibration.SO100Joints[id-1]
-		out[id] = calibration.Derive(spec, 100, 3996, 9999)
+		out[id] = calibration.DeriveHome(spec, 2048, 100, 3996)
 	}
 	return out
 }

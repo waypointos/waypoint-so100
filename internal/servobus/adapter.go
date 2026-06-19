@@ -54,6 +54,28 @@ func (a *Adapter) ReadRaw(id uint32) (uint16, bool) {
 	return r.PositionRaw, true
 }
 
+// ReadServoState requests one servo's full state for the Arm tab's MOTOR
+// DETAIL card. The optional scalar fields are copied as pointers so an absent
+// reading stays absent (rendered N/A) rather than collapsing to a fake zero.
+func (a *Adapter) ReadServoState(id uint32) (*so100v1.ServoState, error) {
+	st, err := a.sv.Read(id)
+	if err != nil {
+		return nil, err
+	}
+	return &so100v1.ServoState{
+		ServoId:            id,
+		PositionRaw:        st.PositionRaw,
+		SpeedRaw:           st.SpeedRaw,
+		LoadRaw:            st.LoadRaw,
+		CurrentRaw:         st.CurrentRaw,
+		VoltageDeci:        st.VoltageDeci,
+		TemperatureC:       st.TemperatureC,
+		Moving:             st.GetMoving(),
+		OvercurrentTripped: st.GetOvercurrentTripped(),
+		Ok:                 st.GetOk(),
+	}, nil
+}
+
 // Read requests one servo's raw state and maps it to the so100 reading shape.
 // An absent (ok=false) servo state surfaces as OK=false, not sentinel zeros.
 func (a *Adapter) Read(id uint32) (calibration.ServoReading, error) {

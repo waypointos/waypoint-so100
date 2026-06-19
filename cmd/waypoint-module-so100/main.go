@@ -61,10 +61,15 @@ func setup(m *wpmodule.M) error {
 	armSrv := armserver.New(sv, svc, cals, names, order)
 
 	// applyCals refreshes the live calibration view shared by the joints
-	// publisher and teleop loop, and the arm server's own snapshot.
+	// publisher and teleop loop, and the arm server's own snapshot. Only OK
+	// joints are applied: a flagged joint must stay uncalibrated rather than be
+	// driven against a bad zero, regardless of how it reached here.
 	applyCals := func(loaded []calibration.JointCal) {
 		next := map[uint32]calibration.JointCal{}
 		for _, c := range loaded {
+			if !c.OK {
+				continue
+			}
 			next[c.ID] = c
 			cals[c.ID] = c
 		}
@@ -74,8 +79,8 @@ func setup(m *wpmodule.M) error {
 	// Calibration progress publisher keeps its private subject; on "done" it
 	// persists and refreshes the live calibration.
 	calSubject := m.Subject("calibration")
-	publish := func(progress []calibration.JointCal, phase string, active uint32) {
-		st := &so100v1.CalibrationState{T: timestamppb.Now(), Phase: phase, ActiveJoint: active}
+	publish := func(progress []calibration.JointCal, phase string, homeSet bool) {
+		st := &so100v1.CalibrationState{T: timestamppb.Now(), Phase: phase, HomeSet: homeSet}
 		for _, c := range progress {
 			jc := &so100v1.JointCalibration{
 				Id: c.ID, Ok: c.OK, FlagReason: c.FlagReason,
@@ -89,17 +94,17 @@ func setup(m *wpmodule.M) error {
 		body, _ := proto.Marshal(st)
 		_ = m.Publish(calSubject, body)
 		if phase == "done" {
-			// Persist and apply only joints that produced a usable map; a joint
-			// that failed (no read / seam) must stay uncalibrated rather than
-			// poison teleop with a garbage zero anchor.
-			mapped := make([]calibration.JointCal, 0, len(progress))
+			// Persist and apply only joints that calibrated cleanly; a flagged
+			// joint (no read / no home / home out of range / seam) must stay
+			// uncalibrated rather than poison teleop with a bad zero anchor.
+			ok := make([]calibration.JointCal, 0, len(progress))
 			for _, c := range progress {
-				if c.Mapped() {
-					mapped = append(mapped, c)
+				if c.OK {
+					ok = append(ok, c)
 				}
 			}
-			_ = calibration.Save(cfg.StatePath, mapped)
-			applyCals(mapped)
+			_ = calibration.Save(cfg.StatePath, ok)
+			applyCals(ok)
 		}
 	}
 
@@ -115,6 +120,8 @@ func setup(m *wpmodule.M) error {
 		switch {
 		case cmd.GetRunCalibration():
 			ctrl.StartRecording()
+		case cmd.GetSetHome():
+			ctrl.SetHome()
 		case cmd.GetFinishCalibration():
 			ctrl.FinishRecording()
 		case cmd.GetAbort():
@@ -126,7 +133,7 @@ func setup(m *wpmodule.M) error {
 
 	// Publish persisted calibration once at boot so the tab shows last state.
 	if loaded, err := calibration.Load(cfg.StatePath); err == nil {
-		publish(loaded, "idle", 0)
+		publish(loaded, "idle", false)
 		applyCals(loaded)
 	}
 
@@ -174,6 +181,30 @@ func setup(m *wpmodule.M) error {
 					_ = m.Publish(m.Subject("joints"), b)
 				}
 				loop.SetJointEstimate(jointEstimateFrom(ja))
+			}
+		}
+	}()
+
+	// ~5 Hz servo-stats publisher feeds the Arm tab's MOTOR DETAIL card with
+	// full per-servo telemetry (position, speed, load, current, voltage, temp).
+	// Slower than the 30 Hz joints loop to keep bus contention down, and yields
+	// to the calibration recorder for the same chain-starvation reason.
+	go func() {
+		t := time.NewTicker(200 * time.Millisecond)
+		defer t.Stop()
+		for {
+			select {
+			case <-m.Done():
+				return
+			case <-t.C:
+				if ctrl.Recording() {
+					continue
+				}
+				stats := jointstate.BuildServoStats([]uint32{1, 2, 3, 4, 5, 6}, sv)
+				stats.T = timestamppb.Now()
+				if b, err := proto.Marshal(stats); err == nil {
+					_ = m.Publish(m.Subject("stats"), b)
+				}
 			}
 		}
 	}()

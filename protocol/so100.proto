@@ -11,7 +11,8 @@ message ArmCommand {
   oneof action {
     bool run_calibration    = 1;  // start a manual range-recording session (torque off, operator sweeps each joint)
     bool abort              = 2;  // stop the running session, discard, torque off
-    bool finish_calibration = 3;  // stop recording, derive + save from the swept ranges
+    bool finish_calibration = 3;  // stop recording, derive + save: zeros from the home pose, soft limits from the sweep
+    bool set_home           = 4;  // capture the current pose as the zero (0 rad) for every joint
   }
 }
 
@@ -21,6 +22,7 @@ message CalibrationState {
   string phase = 2;            // "idle" | "recording" | "done" | "aborted"
   uint32 active_joint = 3;     // unused in manual recording (kept for wire compat), 0
   repeated JointCalibration joints = 4;
+  bool home_set = 5;           // true once the home pose has been captured this session
 }
 
 message JointCalibration {
@@ -33,7 +35,7 @@ message JointCalibration {
   optional int32  measured_span = 7;
   optional int32  expected_span = 8;
   bool   ok          = 9;
-  string flag_reason = 10;     // "" | "seam in workspace" | "span mismatch" | "timeout"
+  string flag_reason = 10;     // "" | "no read" | "no home pose" | "home outside swept range" | "seam in workspace"
 }
 
 // ---- wire-compatible mirror of waypoint.v1 servo.proto (Plan 1) ----
@@ -82,3 +84,11 @@ message Joint {
   string na_reason       = 3;     // populated when angle_rad is absent
 }
 message JointAngles { repeated Joint joints = 1; }
+
+// Module-internal: full per-servo telemetry for the Arm tab's MOTOR DETAIL
+// card. One entry per servo id; a servo that failed to read surfaces as
+// ok=false with its scalar fields absent (rendered N/A, never fake zeros).
+message ServoStats {
+  google.protobuf.Timestamp t = 1;
+  repeated ServoState servos  = 2;
+}

@@ -14,7 +14,8 @@ type fakeReader struct {
 
 func (f *fakeReader) ReadRaw(id uint32) (uint16, bool) { return f.raw[id], f.ok[id] }
 
-// mustDeriveAt builds a JointCal for the given joint id from measured hard stops.
+// mustDeriveAt builds a JointCal for the given joint id, homing at the midpoint
+// of the swept range.
 func mustDeriveAt(t *testing.T, id uint32, rawMin, rawMax uint16) calibration.JointCal {
 	t.Helper()
 	var spec calibration.JointSpec
@@ -24,7 +25,8 @@ func mustDeriveAt(t *testing.T, id uint32, rawMin, rawMax uint16) calibration.Jo
 		}
 	}
 	require.Equal(t, id, spec.ID, "no JointSpec for id %d", id)
-	return calibration.Derive(spec, rawMin, rawMax, 9999)
+	home := uint16((int(rawMin) + int(rawMax)) / 2)
+	return calibration.DeriveHome(spec, home, rawMin, rawMax)
 }
 
 func TestBuildJointAngles_CalibratedAndNA(t *testing.T) {

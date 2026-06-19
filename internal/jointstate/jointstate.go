@@ -37,6 +37,27 @@ func BuildJointAngles(ids []uint32, r RawReader, cals map[uint32]calibration.Joi
 	return out
 }
 
+// StateReader returns a servo's full state for the MOTOR DETAIL card; an error
+// marks that servo absent (ok=false) rather than poisoning the row with zeros.
+type StateReader interface {
+	ReadServoState(id uint32) (*so100v1.ServoState, error)
+}
+
+// BuildServoStats collects full per-servo telemetry for the Arm tab. A failed
+// read becomes an ok=false entry with every scalar absent, so the panel can
+// render N/A for that servo without inventing values.
+func BuildServoStats(ids []uint32, r StateReader) *so100v1.ServoStats {
+	out := &so100v1.ServoStats{}
+	for _, id := range ids {
+		st, err := r.ReadServoState(id)
+		if err != nil || st == nil {
+			st = &so100v1.ServoState{ServoId: id}
+		}
+		out.Servos = append(out.Servos, st)
+	}
+	return out
+}
+
 // PublishSubject is the joints telemetry subject for the given rover/module.
 func PublishSubject(roverID, moduleID string) string {
 	return fmt.Sprintf("waypoint.%s.module.%s.joints", roverID, moduleID)

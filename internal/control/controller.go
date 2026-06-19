@@ -1,7 +1,8 @@
 // Package control runs the so100 manual calibration on command and reports
-// progress. Calibration is a torque-off, human-in-the-loop range recording: the
-// operator sweeps every joint to its extremes while the controller polls the
-// servos, then on finish it derives and persists the phi-anchored map.
+// progress. Calibration is a torque-off, human-in-the-loop session: the operator
+// captures a home pose (the zero) and sweeps every joint to its extremes (the
+// soft limits) while the controller polls the servos, then on finish it derives
+// and persists the home-anchored map.
 package control
 
 import (
@@ -13,9 +14,10 @@ import (
 )
 
 // Publish reports calibration progress (the controller stays transport-agnostic;
-// main wires this to module.so100.calibration). On the terminal "done" phase the
-// wiring persists and applies the calibration.
-type Publish func(cals []calibration.JointCal, phase string, activeJoint uint32)
+// main wires this to module.so100.calibration). homeSet is whether the home pose
+// has been captured this session. On the terminal "done" phase the wiring
+// persists and applies the calibration.
+type Publish func(cals []calibration.JointCal, phase string, homeSet bool)
 
 type Controller struct {
 	client   calibration.ServoClient
@@ -35,7 +37,8 @@ type Controller struct {
 func (c *Controller) Recording() bool { return c.recording.Load() }
 
 type session struct {
-	finish chan bool // true => derive + save, false => abort
+	finish  chan bool     // true => derive + save, false => abort
+	setHome chan struct{} // capture the current pose as the zero
 }
 
 func New(client calibration.ServoClient, pub Publish) *Controller {
@@ -58,7 +61,7 @@ func (c *Controller) StartRecording() {
 		c.mu.Unlock()
 		return
 	}
-	sess := &session{finish: make(chan bool, 1)}
+	sess := &session{finish: make(chan bool, 1), setHome: make(chan struct{}, 1)}
 	c.rec = sess
 	c.mu.Unlock()
 	c.recording.Store(true)
@@ -67,6 +70,21 @@ func (c *Controller) StartRecording() {
 		_ = c.client.DisableTorque(spec.ID)
 	}
 	go c.record(sess)
+}
+
+// SetHome captures the arm's current pose as the zero for every joint. A no-op
+// if nothing is recording.
+func (c *Controller) SetHome() {
+	c.mu.Lock()
+	sess := c.rec
+	c.mu.Unlock()
+	if sess == nil {
+		return
+	}
+	select {
+	case sess.setHome <- struct{}{}:
+	default: // a capture is already pending
+	}
 }
 
 // FinishRecording ends a live session, deriving and persisting the calibration
@@ -98,7 +116,7 @@ func (c *Controller) record(sess *session) {
 	defer sampleT.Stop()
 	defer pubT.Stop()
 
-	c.pub(rec.Live(), "recording", 0)
+	c.pub(rec.Live(), "recording", rec.HomeSet())
 	for {
 		select {
 		case save := <-sess.finish:
@@ -106,17 +124,20 @@ func (c *Controller) record(sess *session) {
 			c.rec = nil
 			c.mu.Unlock()
 			if !save {
-				c.pub(rec.Live(), "aborted", 0)
+				c.pub(rec.Live(), "aborted", rec.HomeSet())
 				return
 			}
 			results := rec.Results(c.cfg)
 			c.applyFences(results)
-			c.pub(results, "done", 0)
+			c.pub(results, "done", rec.HomeSet())
 			return
+		case <-sess.setHome:
+			rec.SetHome(c.client)
+			c.pub(rec.Live(), "recording", rec.HomeSet())
 		case <-sampleT.C:
 			rec.Sample(c.client)
 		case <-pubT.C:
-			c.pub(rec.Live(), "recording", 0)
+			c.pub(rec.Live(), "recording", rec.HomeSet())
 		}
 	}
 }
@@ -124,10 +145,10 @@ func (c *Controller) record(sess *session) {
 // applyFences writes each calibrated joint's soft limits to the servo's hardware
 // angle-limit registers as a backstop, so a runaway goal cannot drive a joint
 // past its measured range even if a software clamp is bypassed. Joints that did
-// not calibrate (no read / seam) are left untouched.
+// not calibrate cleanly (any flag) are left untouched.
 func (c *Controller) applyFences(results []calibration.JointCal) {
 	for _, cal := range results {
-		if cal.FlagReason == "no read" || cal.FlagReason == "seam in workspace" {
+		if !cal.OK {
 			continue
 		}
 		_ = c.client.SetAngleLimits(cal.ID, cal.SoftMin, cal.SoftMax)

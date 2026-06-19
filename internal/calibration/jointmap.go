@@ -1,8 +1,11 @@
-// Package calibration computes the SO-101 arm's raw-tick to URDF-radian map
-// from measured hard stops. The per-tick scale is fixed (direct-drive joints),
-// so calibration discovers only the homing offset and soft limits. Zero is
-// anchored on phi: the joint's URDF lower-limit angle, which is the angle it is
-// in when resting on its lower hard stop.
+// Package calibration computes the SO-101 arm's raw-tick to URDF-radian map.
+// The per-tick scale is fixed (direct-drive joints), so calibration discovers
+// only the homing offset and soft limits. Zero is anchored on a captured home
+// pose: the operator moves the arm to its neutral (URDF-zero) configuration and
+// the raw tick read there becomes 0 rad. The soft limits come from a separate
+// manual sweep of the reachable range. Anchoring on the home pose (rather than a
+// hard stop) keeps the zero correct even when the chassis limits a joint's
+// travel below its URDF range or makes it asymmetric.
 package calibration
 
 import "math"
@@ -12,17 +15,24 @@ const TicksPerRev = 4096.0
 // TicksPerRad converts radians to encoder ticks (fixed for direct-drive joints).
 var TicksPerRad = TicksPerRev / (2 * math.Pi)
 
-// SoftLimitMarginTicks backs the soft limits off the measured hard stops.
+// SoftLimitMarginTicks backs the soft limits off the swept range extremes.
 const SoftLimitMarginTicks = 20
 
-// Flag reasons recorded on a JointCal. Empty means a clean calibration.
-// FlagSpanMismatch still carries a usable map (the measured span just differs
-// from the URDF span — usually an incomplete sweep); FlagNoRead and FlagSeam do
-// NOT carry a map and must not be applied (see Mapped).
+// MinRangeTicks is the smallest reachable span (rawMax-rawMin) a hard-stopped
+// joint must show; below this the sweep was too small to admit valid soft limits
+// (~18 deg).
+const MinRangeTicks = 200
+
+// Flag reasons recorded on a JointCal. Empty means a clean, applicable
+// calibration (see OK). Every non-empty reason means the joint must NOT be
+// applied: it has either no valid zero (FlagNoRead, FlagNoHome, FlagSeam) or
+// unusable limits (FlagHomeOutOfRange, FlagRangeTooSmall).
 const (
-	FlagSpanMismatch = "span mismatch"
-	FlagNoRead       = "no read"
-	FlagSeam         = "seam in workspace"
+	FlagNoRead         = "no read"
+	FlagNoHome         = "no home pose"
+	FlagHomeOutOfRange = "home outside swept range"
+	FlagRangeTooSmall  = "range too small"
+	FlagSeam           = "seam in workspace"
 )
 
 // JointSpec is a fixed property of the SO-101 design. LowerRad is phi.
@@ -60,7 +70,7 @@ type JointCal struct {
 	MeasuredSpan int     `toml:"measured_span"`
 	ExpectedSpan int     `toml:"expected_span"`
 	OK           bool    `toml:"ok"`
-	FlagReason   string  `toml:"flag_reason,omitempty"` // "" when OK; else why (e.g. "span mismatch", "seam in workspace")
+	FlagReason   string  `toml:"flag_reason,omitempty"` // "" when OK; else why (see Flag* constants)
 }
 
 // ExpectedSpanTicks is the joint's full URDF travel in encoder ticks.
@@ -68,33 +78,43 @@ func ExpectedSpanTicks(spec JointSpec) int {
 	return int(math.Round((spec.UpperRad - spec.LowerRad) * TicksPerRad))
 }
 
-// Derive computes the phi-anchored calibration from the two measured hard stops.
-func Derive(spec JointSpec, rawMin, rawMax uint16, spanTolerance int) JointCal {
+// DeriveHome computes a hard-stopped joint's calibration from the captured home
+// pose (the zero) and the swept reachable range (the soft limits). The zero does
+// not assume the swept extremes sit at the URDF limits, so a chassis-limited or
+// asymmetric range still yields a correct zero. The joint is flagged (and left
+// un-OK, hence not applied) if the sweep was too small to admit soft limits or
+// if the home pose falls outside the swept range — both signal a bad session.
+func DeriveHome(spec JointSpec, homeRaw, rawMin, rawMax uint16) JointCal {
+	if rawMin > rawMax {
+		rawMin, rawMax = rawMax, rawMin
+	}
 	measured := int(rawMax) - int(rawMin)
-	expected := ExpectedSpanTicks(spec)
-	ok := absInt(measured-expected) <= spanTolerance
+	ok := true
 	flag := ""
-	if !ok {
-		flag = FlagSpanMismatch
+	switch {
+	case measured < MinRangeTicks:
+		ok, flag = false, FlagRangeTooSmall
+	case homeRaw < rawMin || homeRaw > rawMax:
+		ok, flag = false, FlagHomeOutOfRange
 	}
 	return JointCal{
 		ID:           spec.ID,
 		RawMin:       rawMin,
 		RawMax:       rawMax,
-		ZeroRaw:      float64(rawMin) - spec.LowerRad*TicksPerRad,
+		ZeroRaw:      float64(homeRaw),
 		SoftMin:      rawMin + SoftLimitMarginTicks,
 		SoftMax:      rawMax - SoftLimitMarginTicks,
 		MeasuredSpan: measured,
-		ExpectedSpan: expected,
+		ExpectedSpan: ExpectedSpanTicks(spec),
 		OK:           ok,
 		FlagReason:   flag,
 	}
 }
 
 // DeriveCentered builds the calibration for a stopless joint (wrist roll). Its
-// neutral resting pose is the zero, and the window is a fixed fence rather than
-// two measured hard stops, so there is no span to validate: OK is always true.
-func DeriveCentered(spec JointSpec, centerRaw, rawMin, rawMax uint16) JointCal {
+// home pose is the zero, and the window is a fixed fence rather than two measured
+// hard stops, so there is no range to validate: OK is always true.
+func DeriveCentered(spec JointSpec, homeRaw, rawMin, rawMax uint16) JointCal {
 	if rawMin > rawMax {
 		rawMin, rawMax = rawMax, rawMin
 	}
@@ -102,21 +122,13 @@ func DeriveCentered(spec JointSpec, centerRaw, rawMin, rawMax uint16) JointCal {
 		ID:           spec.ID,
 		RawMin:       rawMin,
 		RawMax:       rawMax,
-		ZeroRaw:      float64(centerRaw),
+		ZeroRaw:      float64(homeRaw),
 		SoftMin:      rawMin + SoftLimitMarginTicks,
 		SoftMax:      rawMax - SoftLimitMarginTicks,
 		MeasuredSpan: int(rawMax) - int(rawMin),
 		ExpectedSpan: ExpectedSpanTicks(spec),
 		OK:           true,
 	}
-}
-
-// Mapped reports whether this calibration carries a usable raw->rad map. A
-// joint that could not be measured (never read, or whose range straddles the
-// encoder seam) has no valid zero, so it must stay uncalibrated rather than be
-// applied with a garbage anchor that teleop would then drive against.
-func (c JointCal) Mapped() bool {
-	return c.FlagReason != FlagNoRead && c.FlagReason != FlagSeam
 }
 
 // ThetaRad maps a raw tick to a URDF joint angle using the derived zero.

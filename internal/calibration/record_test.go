@@ -6,8 +6,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// scriptedReader replays a fixed position sequence per joint, one entry per
-// Sample call, holding the last value once exhausted.
+// scriptedReader replays a fixed position sequence per joint, one entry per Read
+// call (SetHome and each Sample consume one), holding the last value once
+// exhausted. Convention in these tests: entry 0 is the home pose, the rest are
+// the sweep.
 type scriptedReader struct {
 	seq map[uint32][]uint16
 	i   map[uint32]int
@@ -44,64 +46,65 @@ func driveAll(rec *Recorder, r *scriptedReader, n int) {
 	}
 }
 
-func TestRecorder_DerivesHardStopJointFromSweep(t *testing.T) {
+func TestRecorder_DerivesFromHomeAndSweep(t *testing.T) {
 	spec := JointSpec{ID: 2, Name: "shoulder_lift", LowerRad: -1.74533, UpperRad: 1.74533, HasHardStop: true}
-	// Sweep up to the upper stop, back down to the lower stop. Stops span the
-	// joint's URDF range (820 .. 820+expected), so it derives clean and OK.
 	upper := uint16(820 + ExpectedSpanTicks(spec))
-	r := newScriptedReader(map[uint32][]uint16{2: {2000, 2500, upper, 2500, 1500, 820}})
+	// entry 0 (2000) = home; the rest sweep up to `upper` and down to 820.
+	r := newScriptedReader(map[uint32][]uint16{2: {2000, 2500, upper, 1500, 820}})
 	rec := NewRecorder([]JointSpec{spec})
-	driveAll(rec, r, 6)
+	rec.SetHome(r)
+	driveAll(rec, r, 4)
 
 	cal := rec.Results(DefaultRecordConfig())[0]
 	require.True(t, cal.OK)
+	require.InDelta(t, 0, cal.ThetaRad(2000), 1e-9) // home reads as 0 rad
 	require.Equal(t, uint16(820), cal.RawMin)
 	require.Equal(t, upper, cal.RawMax)
-	require.InDelta(t, spec.LowerRad, cal.ThetaRad(cal.RawMin), 2e-2)
-	require.InDelta(t, spec.UpperRad, cal.ThetaRad(cal.RawMax), 2e-2)
 }
 
 func TestRecorder_UnwrapsEncoderSeam(t *testing.T) {
-	// A joint whose travel crosses the 0/4095 seam: 3900 -> wraps -> 600. The
-	// two extremes sit on opposite sides of the seam, so no single linear
-	// raw->rad map over 0..4095 can represent it: unwrapping detects the straddle
-	// and it must be flagged rather than mapped to a broken calibration.
+	// A joint whose travel crosses the 0/4095 seam: 3900 -> wraps -> 600. The two
+	// extremes sit on opposite sides of the seam, so no single linear raw->rad map
+	// over 0..4095 can represent it: unwrapping detects the straddle and it must be
+	// flagged rather than mapped to a broken calibration.
 	spec := JointSpec{ID: 1, Name: "shoulder_pan", LowerRad: -1.91986, UpperRad: 1.91986, HasHardStop: true}
-	r := newScriptedReader(map[uint32][]uint16{1: {3900, 3990, 4090, 4095, 5, 200, 600}})
+	r := newScriptedReader(map[uint32][]uint16{1: {4000, 3900, 3990, 4090, 4095, 5, 200, 600}})
 	rec := NewRecorder([]JointSpec{spec})
+	rec.SetHome(r)
 	driveAll(rec, r, 7)
 
 	cal := rec.Results(DefaultRecordConfig())[0]
 	require.False(t, cal.OK)
-	require.Equal(t, "seam in workspace", cal.FlagReason)
+	require.Equal(t, FlagSeam, cal.FlagReason)
 }
 
 func TestRecorder_NonSeamWideSpanIsContinuous(t *testing.T) {
-	// Same encoder readings, but interpret the unwrapped span: a joint that never
-	// crosses the seam yields direct == true span and derives cleanly.
 	spec := JointSpec{ID: 1, Name: "shoulder_pan", LowerRad: -1.91986, UpperRad: 1.91986, HasHardStop: true}
-	r := newScriptedReader(map[uint32][]uint16{1: {800, 1500, 2048, 2600, 3300}})
+	r := newScriptedReader(map[uint32][]uint16{1: {2048, 800, 1500, 2048, 2600, 3300}})
 	rec := NewRecorder([]JointSpec{spec})
+	rec.SetHome(r)
 	driveAll(rec, r, 5)
 
 	cal := rec.Results(DefaultRecordConfig())[0]
+	require.True(t, cal.OK)
 	require.Equal(t, uint16(800), cal.RawMin)
 	require.Equal(t, uint16(3300), cal.RawMax)
-	require.Empty(t, cal.FlagReason)
+	require.InDelta(t, 0, cal.ThetaRad(2048), 1e-9)
 }
 
-func TestRecorder_StoplessJointCentersOnRestWithoutFlag(t *testing.T) {
+func TestRecorder_StoplessJointCentersOnHome(t *testing.T) {
 	spec := JointSpec{ID: 5, Name: "wrist_roll", LowerRad: -2.74385, UpperRad: 2.84121, HasHardStop: false}
-	r := newScriptedReader(map[uint32][]uint16{5: {2048, 2200, 1900}})
+	r := newScriptedReader(map[uint32][]uint16{5: {3000, 3000, 3100, 2900}})
 	rec := NewRecorder([]JointSpec{spec})
+	rec.SetHome(r)
 	driveAll(rec, r, 3)
 
-	cal := rec.Results(DefaultRecordConfig())[0]
-	require.True(t, cal.OK)
-	require.InDelta(t, 0, cal.ThetaRad(2048), 1e-9) // resting start is the zero
 	cfg := DefaultRecordConfig()
-	require.Equal(t, uint16(2048-cfg.NoStopCapTicks), cal.RawMin)
-	require.Equal(t, uint16(2048+cfg.NoStopCapTicks), cal.RawMax)
+	cal := rec.Results(cfg)[0]
+	require.True(t, cal.OK)
+	require.InDelta(t, 0, cal.ThetaRad(3000), 1e-9) // home is the zero
+	require.Equal(t, uint16(3000-cfg.NoStopCapTicks), cal.RawMin)
+	require.Equal(t, uint16(3000+cfg.NoStopCapTicks), cal.RawMax)
 }
 
 func TestRecorder_UnreadJointIsFlagged(t *testing.T) {
@@ -111,13 +114,17 @@ func TestRecorder_UnreadJointIsFlagged(t *testing.T) {
 
 	cal := rec.Results(DefaultRecordConfig())[0]
 	require.False(t, cal.OK)
-	require.Equal(t, "no read", cal.FlagReason)
-	require.False(t, cal.Mapped(), "unread joint has no usable map and must not be applied")
+	require.Equal(t, FlagNoRead, cal.FlagReason)
 }
 
-func TestMapped_DistinguishesUsableCalibrations(t *testing.T) {
-	require.True(t, JointCal{}.Mapped(), "clean calibration is usable")
-	require.True(t, JointCal{FlagReason: FlagSpanMismatch}.Mapped(), "span mismatch still carries a map")
-	require.False(t, JointCal{FlagReason: FlagNoRead}.Mapped())
-	require.False(t, JointCal{FlagReason: FlagSeam}.Mapped())
+func TestRecorder_SweptButNotHomedIsFlagged(t *testing.T) {
+	spec := JointSpec{ID: 3, Name: "elbow_flex", LowerRad: -1.69, UpperRad: 1.69, HasHardStop: true}
+	r := newScriptedReader(map[uint32][]uint16{3: {1000, 1500, 2000, 2500}})
+	rec := NewRecorder([]JointSpec{spec})
+	driveAll(rec, r, 4) // sweep, but SetHome never called
+	require.False(t, rec.HomeSet())
+
+	cal := rec.Results(DefaultRecordConfig())[0]
+	require.False(t, cal.OK)
+	require.Equal(t, FlagNoHome, cal.FlagReason)
 }
