@@ -11,7 +11,7 @@ import styles from './CalibrationCard.module.css';
 export function CalibrationCard({ cal }: { cal: CalibrationState | null }) {
   const { roverId, publish } = useBridge();
 
-  const send = (action: 'runCalibration' | 'finishCalibration' | 'abort') => {
+  const send = (action: 'runCalibration' | 'setHome' | 'finishCalibration' | 'abort') => {
     const cmd = new ArmCommand({ action: { case: action, value: true } });
     publish(`waypoint.${roverId}.module.so100.command`, cmd.toBinary());
   };
@@ -19,23 +19,32 @@ export function CalibrationCard({ cal }: { cal: CalibrationState | null }) {
   const byId = new Map((cal?.joints ?? []).map((j) => [j.id, j]));
   const phase = cal?.phase ?? 'idle';
   const recording = phase === 'recording';
+  const homeSet = cal?.homeSet ?? false;
 
   const controls = recording ? (
     <>
-      <button className={styles.run} onClick={() => send('finishCalibration')}>Done — save</button>
+      <button className={styles.run} onClick={() => send('setHome')}>
+        {homeSet ? 'Re-set home' : 'Set home'}
+      </button>
+      <button className={styles.run} onClick={() => send('finishCalibration')} disabled={!homeSet}>
+        Done — save
+      </button>
       <button className={styles.abort} onClick={() => send('abort')}>Abort</button>
     </>
   ) : (
     <button className={styles.run} onClick={() => send('runCalibration')}>Start calibration</button>
   );
 
+  const note = recording ? `${phase.toUpperCase()} · ${homeSet ? 'HOME SET' : 'NO HOME'}` : phase.toUpperCase();
+
   return (
-    <Panel title="CALIBRATION" note={phase.toUpperCase()} action={controls}>
+    <Panel title="CALIBRATION" note={note} action={controls}>
       {recording && (
         <p className={styles.hint}>
-          Torque is off — support the arm so it doesn’t drop, then move every joint slowly through
-          its full range until it meets each hard stop (open and close the gripper too). Click
-          “Done — save” when finished.
+          Torque is off — support the arm so it doesn’t drop. <b>1.</b> Move the arm to its neutral
+          (straight / URDF-zero) pose and click <b>Set home</b>. <b>2.</b> Move every joint slowly
+          through its full range to both limits (open and close the gripper too). <b>3.</b> Click
+          <b> Done — save</b>.
         </p>
       )}
 

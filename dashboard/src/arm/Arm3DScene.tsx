@@ -8,7 +8,14 @@ import { applyMonochrome, setArmOpacity } from './applyMonochrome';
 import { SO100_JOINTS, type ServoId } from './joints';
 import { presetByKey, type PresetKey } from './cameraPresets';
 
-const URDF_URL = '/models/so101/so101.urdf';
+// Resolve the model relative to this bundle's own URL, not the host origin
+// root. The host serves the module under a prefix (e.g. /dashboard/), so an
+// absolute "/models/…" path would 404; bundle-relative resolves correctly
+// wherever the panel/teleop bundle is mounted. urdf-loader then resolves the
+// STL meshes relative to this URDF URL in turn. The path is held in a variable
+// so Vite leaves it as a pure runtime resolution (no build-time asset probe).
+const URDF_REL = './models/so101/so101.urdf';
+const URDF_URL = new URL(URDF_REL, import.meta.url).href;
 
 const cssVar = (name: string) =>
   getComputedStyle(document.documentElement).getPropertyValue(name).trim();
