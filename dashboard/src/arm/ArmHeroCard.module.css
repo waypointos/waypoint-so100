@@ -1,15 +1,31 @@
-/* The render stage: a tall slab the 3D/2D view fills, with overlay controls.
+/* Two render panes side by side (3D | 2D); the 1px gap reads as a divider. */
+.stages {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--color-border);
+}
+@media (max-width: 900px) {
+  .stages { grid-template-columns: 1fr; }
+}
+
+/* Each render stage: a tall slab the view fills, with overlay controls.
    Mirrors the teleop viewport so the canvas sizes the same known-good way. */
 .stage {
   position: relative;
-  height: 340px;
+  height: 440px;
   background: var(--color-bg-elev-1, #15151a);
   overflow: hidden;
 }
 .stage :global(canvas) { display: block; }
 
-/* Mode toggle (top-right) and preset/flat row (bottom-center) — teleop chrome. */
-.modeRow { position: absolute; top: 8px; right: 10px; display: flex; gap: 2px; }
+.tag {
+  position: absolute; top: 8px; left: 10px; z-index: 1;
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--color-fg-4); pointer-events: none;
+}
+
+/* Preset/flat row (bottom-center). */
 .presetRow {
   position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%);
   display: flex; gap: 2px;

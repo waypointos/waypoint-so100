@@ -20,7 +20,7 @@
 }
 
 .detail th:first-child,
-.detailId { text-align: left; }
+.detail td:first-child { text-align: left; }
 
 .detail td {
   text-align: right;
