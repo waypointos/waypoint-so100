@@ -3,13 +3,9 @@
 // module.so100.stats stream: position/speed/load/current ticks, bus volts,
 // temperature, and a live status cell. A servo that did not respond renders
 // every cell as "—" (ok=false) rather than a fake zero.
-import { SO100_JOINTS, type ServoId } from './joints';
+import { SO100_JOINTS, SHORT_LABEL, type ServoId } from './joints';
 import type { Stats } from '../useArmTelemetry';
 import styles from './MotorDetail.module.css';
-
-const SHORT: Record<ServoId, string> = {
-  1: 'pan', 2: 'lift', 3: 'elbow', 4: 'w.flex', 5: 'w.roll', 6: 'grip',
-};
 
 const num = (v: number | undefined): string => (v == null ? '—' : String(v));
 const volts = (deci: number | undefined): string => (deci == null ? '—' : (deci / 10).toFixed(1));
@@ -50,7 +46,7 @@ export function MotorDetail({ stats }: { stats: Stats }) {
           return (
             <tr key={spec.id} data-servo={spec.id}>
               <td className={styles.detailId}>
-                {String(spec.id).padStart(2, '0')} · {SHORT[spec.id]}
+                {String(spec.id).padStart(2, '0')} · {SHORT_LABEL[spec.id]}
               </td>
               <td>{num(s?.positionRaw)}</td>
               <td>{num(s?.speedRaw)}</td>

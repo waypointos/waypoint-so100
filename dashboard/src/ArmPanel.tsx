@@ -9,6 +9,7 @@
 import { useMemo } from 'react';
 import { ArmHeroCard } from './arm/ArmHeroCard';
 import { JointRail } from './arm/JointRail';
+import { MotorCards } from './arm/MotorCards';
 import { MotorDetail } from './arm/MotorDetail';
 import { CalibrationCard } from './arm/CalibrationCard';
 import { Panel } from './ui/Panel';
@@ -39,6 +40,7 @@ export function ArmPanel() {
     ? Math.round(((gripRad - gripper.lowerRad) / (gripper.upperRad - gripper.lowerRad)) * 100)
     : null;
 
+  const liveMotors = SO100_JOINTS.filter((j) => stats[j.id]?.ok).length;
   const stale = ageMs !== null && ageMs > STALE_AFTER_MS;
   const feed = ageMs === null
     ? { cls: styles.feedOff, text: 'awaiting telemetry' }
@@ -49,7 +51,10 @@ export function ArmPanel() {
   return (
     <div className={styles.layout} data-arm-panel data-testid="panel-m-so100">
       <div className={styles.center}>
-        <ArmHeroCard pose={pose} />
+        <ArmHeroCard pose={pose} readings={readings} />
+        <Panel title="MOTORS" note={`${liveMotors}/${SO100_JOINTS.length} live · STS3215`}>
+          <MotorCards stats={stats} />
+        </Panel>
         <Panel title="MOTOR DETAIL" note="raw telemetry">
           <MotorDetail stats={stats} />
         </Panel>

@@ -36,22 +36,41 @@
   color: var(--color-caution);
 }
 
+/* Aligned identically to MOTOR DETAIL: fixed layout, mono, right-aligned cells
+   with a left-aligned first column and an uppercase header row. */
 .joints {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
 }
-.joints tr { border-bottom: 1px solid var(--color-border-soft); }
-.joints tr:last-of-type { border-bottom: none; }
-.joints td { padding: var(--space-sm) var(--space-sm); vertical-align: middle; }
+.joints th {
+  text-align: right;
+  font-weight: 500;
+  color: var(--color-fg-4);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 4px 8px 6px 8px;
+  border-bottom: 1px solid var(--color-border);
+}
+.joints th:first-child { text-align: left; padding-left: 0; }
+.joints th:last-child { padding-right: 0; }
+.joints td {
+  text-align: right;
+  padding: 4px 8px;
+  color: var(--color-fg-2);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
 .joints td:first-child { padding-left: 0; }
 .joints td:last-child { padding-right: 0; }
+.joints tbody tr:last-of-type td { border-bottom: none; }
 
 .active { background: var(--color-accent-tint); }
-.jointName { color: var(--color-fg-2); }
-.range { color: var(--color-fg); font-variant-numeric: tabular-nums; }
+.jointName { text-align: left; color: var(--color-fg-3); white-space: nowrap; }
+.range { color: var(--color-fg-2); }
 .status { text-align: right; }
-.na { color: var(--color-fg-3); }
+.na { color: var(--color-fg-4); }
 .ok { color: var(--color-ok); }
 .flag { color: var(--color-caution); }

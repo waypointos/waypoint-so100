@@ -1,46 +1,53 @@
-/* The 3D stage: a tall slab the canvas fills, mirroring the host CameraStage
-   media frame. The opacity control floats over the bottom-left corner. */
+/* The render stage: a tall slab the 3D/2D view fills, with overlay controls.
+   Mirrors the teleop viewport so the canvas sizes the same known-good way. */
 .stage {
   position: relative;
   height: 340px;
   background: var(--color-bg-elev-1, #15151a);
   overflow: hidden;
 }
-.stage > :global(canvas) { display: block; width: 100% !important; height: 100% !important; }
+.stage :global(canvas) { display: block; }
 
-.presetRow { display: inline-flex; gap: 2px; }
-
-.presetBtn {
-  padding: 2px 7px;
-  background: transparent;
+/* Mode toggle (top-right) and preset/flat row (bottom-center) — teleop chrome. */
+.modeRow { position: absolute; top: 8px; right: 10px; display: flex; gap: 2px; }
+.presetRow {
+  position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%);
+  display: flex; gap: 2px;
+}
+.vpBtn {
+  background: var(--color-bg-overlay, rgba(0, 0, 0, 0.7));
   border: 1px solid var(--color-border);
   color: var(--color-fg-3);
   font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.04em;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 3px 8px;
   cursor: pointer;
   transition: color var(--motion-fast), border-color var(--motion-fast);
 }
-.presetBtn:hover { color: var(--color-fg-2); border-color: var(--color-fg-4); }
-.presetBtn[aria-pressed='true'] {
-  color: var(--color-fg);
-  border-color: var(--color-accent);
-}
+.vpBtn:hover { color: var(--color-fg-2); }
+.vpBtn[aria-pressed='true'] { color: var(--color-fg); border-color: var(--color-fg-4); }
 
 .opacity {
   position: absolute;
-  left: var(--space-sm);
-  bottom: var(--space-sm);
+  left: 10px;
+  bottom: 8px;
   display: inline-flex;
   align-items: center;
-  gap: var(--space-sm);
-  padding: 3px var(--space-sm);
-  background: var(--color-bg-overlay, rgba(0, 0, 0, 0.7));
-  color: var(--color-fg-3);
+  gap: 6px;
+  color: var(--color-fg-4);
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 9px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
-.opacity input { width: 90px; accent-color: var(--color-accent); }
-.opacityVal { color: var(--color-fg-2); font-variant-numeric: tabular-nums; min-width: 18px; text-align: right; }
+.opacity input[type='range'] {
+  width: 70px; height: 2px; -webkit-appearance: none; appearance: none;
+  background: var(--color-raise); outline: none;
+}
+.opacity input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 8px; height: 8px; border-radius: 0;
+  background: var(--color-fg-2); border: none;
+}
+.opacityVal { color: var(--color-fg-2); min-width: 3ch; text-align: right; }

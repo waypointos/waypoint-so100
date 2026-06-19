@@ -1,0 +1,49 @@
+/* Mirrors the host MotorCard grid from OVERVIEW. */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 6px;
+}
+
+.card {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  background: rgba(255, 255, 255, 0.025);
+  border-left: 2px solid transparent;
+}
+.card.hot { background: var(--color-caution-tint); border-left-color: var(--color-caution); }
+.card.off { opacity: 0.5; }
+
+.id {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--color-fg-3);
+  line-height: 1.15;
+  letter-spacing: 0.04em;
+}
+
+.vals { display: flex; flex-direction: column; min-width: 0; }
+.a {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-fg);
+  font-variant-numeric: tabular-nums;
+}
+.a .u { font-size: 9px; color: var(--color-fg-3); margin-left: 3px; }
+.t { font-family: var(--font-mono); font-size: 9px; color: var(--color-fg-3); }
+.hot .t { color: var(--color-caution); }
+
+.vel {
+  margin-top: 2px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+.velLbl  { color: var(--color-fg-4); text-transform: uppercase; letter-spacing: 0.06em; }
+.velVal  { color: var(--color-fg-2); font-variant-numeric: tabular-nums; }
+.velUnit { color: var(--color-fg-4); margin-left: 2px; }

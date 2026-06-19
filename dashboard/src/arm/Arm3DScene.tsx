@@ -155,7 +155,18 @@ export function Arm3DScene({ joints, preset, opacity }: {
     setGeneration((g) => g + 1);
   }, []);
 
-  if (error) return null;
+  if (error) {
+    return (
+      <div style={{
+        position: 'absolute', inset: 0, display: 'flex', alignItems: 'center',
+        justifyContent: 'center', textAlign: 'center', padding: '0 16px',
+        fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.04em',
+        color: 'var(--color-fg-4)',
+      }}>
+        3D model unavailable — {error.message || 'failed to load'}. Switch to 2d.
+      </div>
+    );
+  }
 
   return (
     <Canvas

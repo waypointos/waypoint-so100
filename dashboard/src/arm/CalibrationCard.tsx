@@ -40,6 +40,13 @@ export function CalibrationCard({ cal }: { cal: CalibrationState | null }) {
       )}
 
       <table className={styles.joints}>
+        <thead>
+          <tr>
+            <th>Joint</th>
+            <th>Range</th>
+            <th>Status</th>
+          </tr>
+        </thead>
         <tbody>
           {SO100_JOINTS.map((spec) => {
             const j = byId.get(spec.id);

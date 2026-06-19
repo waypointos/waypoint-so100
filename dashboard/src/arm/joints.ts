@@ -21,6 +21,11 @@ export const SO100_JOINTS: readonly JointSpec[] = [
   { id: 6, name: 'gripper',       label: 'Gripper',       lowerRad: -0.17453, upperRad: 1.74533 },
 ];
 
+// Compact slot labels for dense telemetry surfaces (MOTORS / MOTOR DETAIL).
+export const SHORT_LABEL: Record<ServoId, string> = {
+  1: 'pan', 2: 'lift', 3: 'elbow', 4: 'w.flex', 5: 'w.roll', 6: 'grip',
+};
+
 export const degToRad = (deg: number): number => (deg * Math.PI) / 180;
 export const radToDeg = (rad: number): number => (rad * 180) / Math.PI;
 
