@@ -1,0 +1,57 @@
+/* CALIBRATION card body. Header chrome (title/phase/actions) comes from Panel. */
+.run {
+  padding: var(--space-xs) var(--space-md);
+  background: var(--color-accent);
+  color: var(--color-fg);
+  border: 1px solid var(--color-accent);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background var(--motion);
+}
+.run:hover:not(:disabled) { background: var(--color-accent-hover); }
+.run:disabled {
+  background: var(--color-surface-2);
+  color: var(--color-fg-4);
+  border-color: var(--color-border);
+  cursor: default;
+}
+
+.abort {
+  padding: var(--space-xs) var(--space-md);
+  background: transparent;
+  color: var(--color-caution);
+  border: 1px solid var(--color-caution);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background var(--motion);
+}
+.abort:hover { background: var(--color-caution-tint, rgba(255, 180, 0, 0.12)); }
+
+.hint {
+  margin: 0 0 var(--space-md);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--color-caution);
+}
+
+.joints {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.joints tr { border-bottom: 1px solid var(--color-border-soft); }
+.joints tr:last-of-type { border-bottom: none; }
+.joints td { padding: var(--space-sm) var(--space-sm); vertical-align: middle; }
+.joints td:first-child { padding-left: 0; }
+.joints td:last-child { padding-right: 0; }
+
+.active { background: var(--color-accent-tint); }
+.jointName { color: var(--color-fg-2); }
+.range { color: var(--color-fg); font-variant-numeric: tabular-nums; }
+.status { text-align: right; }
+.na { color: var(--color-fg-3); }
+.ok { color: var(--color-ok); }
+.flag { color: var(--color-caution); }

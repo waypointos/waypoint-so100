@@ -5,6 +5,11 @@
   border-left: 1px solid var(--color-border);
   display: flex; flex-direction: column;
 }
+/* Card variant: fills the JOINTS panel on the Arm tab (no rail chrome). The
+   panel header already names the card, so the rail's own head is hidden. */
+.card { display: flex; flex-direction: column; }
+.card .head { display: none; }
+.card .row { padding-left: 0; padding-right: 0; }
 .head {
   padding: 6px var(--space-md) 4px; display: flex; justify-content: space-between;
   font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.1em;

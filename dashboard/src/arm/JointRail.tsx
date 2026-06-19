@@ -15,9 +15,13 @@ function fixedDeg(rad: number): string {
   return `${(v >= 0 ? '+' : '') + v.toFixed(1)}°`.padStart(7, NBSP);
 }
 
-export function JointRail({ readings }: { readings: Readings }) {
+export function JointRail({ readings, variant = 'rail' }: {
+  readings: Readings;
+  /** 'rail' = bordered fixed-width column (teleop); 'card' = fills a panel (Arm tab). */
+  variant?: 'rail' | 'card';
+}) {
   return (
-    <div className={styles.rail} data-joint-rail>
+    <div className={variant === 'card' ? styles.card : styles.rail} data-joint-rail>
       <div className={styles.head}><span>joints</span><span>deg</span></div>
       {SO100_JOINTS.map((spec) => {
         const r = readings[spec.id as ServoId];

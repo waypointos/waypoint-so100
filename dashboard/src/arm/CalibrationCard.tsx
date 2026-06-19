@@ -1,13 +1,15 @@
-import { useBridge } from './bridge';
-import { useCalibration } from './useCalibration';
-import { ArmOverlay } from './arm/ArmOverlay';
-import { ArmCommand } from './proto/so100_pb';
-import { SO100_JOINTS } from './arm/joints';
-import styles from './CalibratePanel.module.css';
+// CALIBRATION card for the Arm tab. Holds the range-recording workflow that
+// used to be the entire tab: start/finish/abort controls in the card header,
+// the per-joint captured-range table below. Torque is off during recording, so
+// the hint warns the operator to support the arm.
+import { useBridge } from '../bridge';
+import { ArmCommand, type CalibrationState } from '../proto/so100_pb';
+import { SO100_JOINTS } from './joints';
+import { Panel } from '../ui/Panel';
+import styles from './CalibrationCard.module.css';
 
-export function CalibratePanel() {
+export function CalibrationCard({ cal }: { cal: CalibrationState | null }) {
   const { roverId, publish } = useBridge();
-  const cal = useCalibration();
 
   const send = (action: 'runCalibration' | 'finishCalibration' | 'abort') => {
     const cmd = new ArmCommand({ action: { case: action, value: true } });
@@ -18,27 +20,17 @@ export function CalibratePanel() {
   const phase = cal?.phase ?? 'idle';
   const recording = phase === 'recording';
 
-  return (
-    <div className={styles.wrap} data-testid="panel-m-so100">
-      <header className={styles.header}>
-        <span className={styles.title}>ARM CALIBRATION</span>
-        <span className={styles.phase}>{phase.toUpperCase()}</span>
-        {recording ? (
-          <>
-            <button className={styles.run} onClick={() => send('finishCalibration')}>
-              Done — save
-            </button>
-            <button className={styles.abort} onClick={() => send('abort')}>
-              Abort
-            </button>
-          </>
-        ) : (
-          <button className={styles.run} onClick={() => send('runCalibration')}>
-            Start calibration
-          </button>
-        )}
-      </header>
+  const controls = recording ? (
+    <>
+      <button className={styles.run} onClick={() => send('finishCalibration')}>Done — save</button>
+      <button className={styles.abort} onClick={() => send('abort')}>Abort</button>
+    </>
+  ) : (
+    <button className={styles.run} onClick={() => send('runCalibration')}>Start calibration</button>
+  );
 
+  return (
+    <Panel title="CALIBRATION" note={phase.toUpperCase()} action={controls}>
       {recording && (
         <p className={styles.hint}>
           Torque is off — support the arm so it doesn’t drop, then move every joint slowly through
@@ -70,8 +62,6 @@ export function CalibratePanel() {
           })}
         </tbody>
       </table>
-
-      <ArmOverlay />
-    </div>
+    </Panel>
   );
 }

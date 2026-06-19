@@ -1,0 +1,46 @@
+/* The 3D stage: a tall slab the canvas fills, mirroring the host CameraStage
+   media frame. The opacity control floats over the bottom-left corner. */
+.stage {
+  position: relative;
+  height: 340px;
+  background: var(--color-bg-elev-1, #15151a);
+  overflow: hidden;
+}
+.stage > :global(canvas) { display: block; width: 100% !important; height: 100% !important; }
+
+.presetRow { display: inline-flex; gap: 2px; }
+
+.presetBtn {
+  padding: 2px 7px;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-fg-3);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: color var(--motion-fast), border-color var(--motion-fast);
+}
+.presetBtn:hover { color: var(--color-fg-2); border-color: var(--color-fg-4); }
+.presetBtn[aria-pressed='true'] {
+  color: var(--color-fg);
+  border-color: var(--color-accent);
+}
+
+.opacity {
+  position: absolute;
+  left: var(--space-sm);
+  bottom: var(--space-sm);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 3px var(--space-sm);
+  background: var(--color-bg-overlay, rgba(0, 0, 0, 0.7));
+  color: var(--color-fg-3);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.opacity input { width: 90px; accent-color: var(--color-accent); }
+.opacityVal { color: var(--color-fg-2); font-variant-numeric: tabular-nums; min-width: 18px; text-align: right; }

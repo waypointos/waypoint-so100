@@ -1,0 +1,48 @@
+/* Mirrors the host MotorDetailTable: fixed layout pins column widths to the
+   header so live cells that change digit width never reflow the table. */
+.detail {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.detail th {
+  text-align: right;
+  font-weight: 500;
+  color: var(--color-fg-4);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 4px 8px 6px 8px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.detail th:first-child,
+.detailId { text-align: left; }
+
+.detail td {
+  text-align: right;
+  padding: 4px 8px;
+  color: var(--color-fg-2);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.detail tbody tr:last-of-type td { border-bottom: none; }
+
+.detailId { color: var(--color-fg-3); white-space: nowrap; }
+
+.st { text-align: right; }
+.stOk    { color: var(--color-ok); }
+.stMove  { color: var(--color-accent); }
+.stFault { color: var(--color-fault); }
+.stOff   { color: var(--color-fg-4); }
+
+.detailFoot {
+  padding-top: 8px;
+  color: var(--color-fg-4);
+  font-size: 10px;
+  text-align: left;
+  letter-spacing: 0.04em;
+}

@@ -33,12 +33,20 @@ export class ArmCommand extends Message<ArmCommand> {
     case: "abort";
   } | {
     /**
-     * stop recording, derive + save from the swept ranges
+     * stop recording, derive + save: zeros from the home pose, soft limits from the sweep
      *
      * @generated from field: bool finish_calibration = 3;
      */
     value: boolean;
     case: "finishCalibration";
+  } | {
+    /**
+     * capture the current pose as the zero (0 rad) for every joint
+     *
+     * @generated from field: bool set_home = 4;
+     */
+    value: boolean;
+    case: "setHome";
   } | { case: undefined; value?: undefined } = { case: undefined };
 
   constructor(data?: PartialMessage<ArmCommand>) {
@@ -52,6 +60,7 @@ export class ArmCommand extends Message<ArmCommand> {
     { no: 1, name: "run_calibration", kind: "scalar", T: 8 /* ScalarType.BOOL */, oneof: "action" },
     { no: 2, name: "abort", kind: "scalar", T: 8 /* ScalarType.BOOL */, oneof: "action" },
     { no: 3, name: "finish_calibration", kind: "scalar", T: 8 /* ScalarType.BOOL */, oneof: "action" },
+    { no: 4, name: "set_home", kind: "scalar", T: 8 /* ScalarType.BOOL */, oneof: "action" },
   ]);
 
   static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): ArmCommand {
@@ -101,6 +110,13 @@ export class CalibrationState extends Message<CalibrationState> {
    */
   joints: JointCalibration[] = [];
 
+  /**
+   * true once the home pose has been captured this session
+   *
+   * @generated from field: bool home_set = 5;
+   */
+  homeSet = false;
+
   constructor(data?: PartialMessage<CalibrationState>) {
     super();
     proto3.util.initPartial(data, this);
@@ -113,6 +129,7 @@ export class CalibrationState extends Message<CalibrationState> {
     { no: 2, name: "phase", kind: "scalar", T: 9 /* ScalarType.STRING */ },
     { no: 3, name: "active_joint", kind: "scalar", T: 13 /* ScalarType.UINT32 */ },
     { no: 4, name: "joints", kind: "message", T: JointCalibration, repeated: true },
+    { no: 5, name: "home_set", kind: "scalar", T: 8 /* ScalarType.BOOL */ },
   ]);
 
   static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): CalibrationState {
@@ -184,7 +201,7 @@ export class JointCalibration extends Message<JointCalibration> {
   ok = false;
 
   /**
-   * "" | "seam in workspace" | "span mismatch" | "timeout"
+   * "" | "no read" | "no home pose" | "home outside swept range" | "seam in workspace"
    *
    * @generated from field: string flag_reason = 10;
    */
@@ -712,6 +729,53 @@ export class JointAngles extends Message<JointAngles> {
 
   static equals(a: JointAngles | PlainMessage<JointAngles> | undefined, b: JointAngles | PlainMessage<JointAngles> | undefined): boolean {
     return proto3.util.equals(JointAngles, a, b);
+  }
+}
+
+/**
+ * Module-internal: full per-servo telemetry for the Arm tab's MOTOR DETAIL
+ * card. One entry per servo id; a servo that failed to read surfaces as
+ * ok=false with its scalar fields absent (rendered N/A, never fake zeros).
+ *
+ * @generated from message waypoint.module.so100.v1.ServoStats
+ */
+export class ServoStats extends Message<ServoStats> {
+  /**
+   * @generated from field: google.protobuf.Timestamp t = 1;
+   */
+  t?: Timestamp;
+
+  /**
+   * @generated from field: repeated waypoint.module.so100.v1.ServoState servos = 2;
+   */
+  servos: ServoState[] = [];
+
+  constructor(data?: PartialMessage<ServoStats>) {
+    super();
+    proto3.util.initPartial(data, this);
+  }
+
+  static readonly runtime: typeof proto3 = proto3;
+  static readonly typeName = "waypoint.module.so100.v1.ServoStats";
+  static readonly fields: FieldList = proto3.util.newFieldList(() => [
+    { no: 1, name: "t", kind: "message", T: Timestamp },
+    { no: 2, name: "servos", kind: "message", T: ServoState, repeated: true },
+  ]);
+
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): ServoStats {
+    return new ServoStats().fromBinary(bytes, options);
+  }
+
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): ServoStats {
+    return new ServoStats().fromJson(jsonValue, options);
+  }
+
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): ServoStats {
+    return new ServoStats().fromJsonString(jsonString, options);
+  }
+
+  static equals(a: ServoStats | PlainMessage<ServoStats> | undefined, b: ServoStats | PlainMessage<ServoStats> | undefined): boolean {
+    return proto3.util.equals(ServoStats, a, b);
   }
 }
 

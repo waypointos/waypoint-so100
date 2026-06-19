@@ -1,6 +1,6 @@
 import { createRoot } from 'react-dom/client';
 import { BridgeProvider } from './bridge';
-import { CalibratePanel } from './CalibratePanel';
+import { ArmPanel } from './ArmPanel';
 import './ui/tokens.css';
 
 type ModuleContext = {
@@ -15,7 +15,7 @@ export default {
     const root = createRoot(container);
     root.render(
       <BridgeProvider value={{ roverId: ctx.roverId, subscribe: ctx.subscribe, publish: ctx.publish }}>
-        <CalibratePanel />
+        <ArmPanel />
       </BridgeProvider>,
     );
     return () => root.unmount();

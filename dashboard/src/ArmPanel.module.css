@@ -1,0 +1,44 @@
+/* Two-column tab layout mirroring the host OVERVIEW: scrollable center column
+   of primary cards + a fixed-width right rail. Collapses to one column when the
+   tab is narrow. */
+.layout {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 14px;
+  padding: 14px;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  min-height: 100%;
+  align-items: start;
+}
+
+.center { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.rail   { display: flex; flex-direction: column; gap: 14px; }
+
+@media (max-width: 760px) {
+  .layout { grid-template-columns: 1fr; }
+}
+
+/* STATUS card: label/value rows in mono. */
+.status { display: flex; flex-direction: column; gap: 6px; }
+.statusRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.statusLbl {
+  color: var(--color-fg-3);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.statusVal { color: var(--color-fg-2); font-variant-numeric: tabular-nums; }
+.warn { color: var(--color-caution); font-variant-numeric: tabular-nums; }
+
+.feed { display: inline-flex; align-items: center; gap: 6px; }
+.dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.feedLive  { color: var(--color-ok); }
+.feedStale { color: var(--color-caution); }
+.feedOff   { color: var(--color-fg-4); }
