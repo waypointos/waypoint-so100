@@ -143,7 +143,12 @@ func setup(m *wpmodule.M) error {
 		StaleAfter: 150 * time.Millisecond,
 		// Rates are tune-on-hardware; opened up from the initial conservative set
 		// once the reference-reseed jitter (SetJointEstimate gating) was fixed.
+		// GoalSpeedHeadroom caps each joint's moving speed near the rate the loop
+		// is integrating so streamed goals are glided to, not darted to at the
+		// servos' default max speed (the per-tick start/stop jitter). Tune on
+		// hardware: lower → smoother but laggier, higher → snappier but buzzier.
 		MaxLinear: 0.25, MaxPitch: 1.5, MaxRoll: 1.5, MaxGrip: 2.0, RampPerTick: 0.04, Dt: 0.02,
+		GoalSpeedHeadroom: 1.3,
 	}, sv, cals, ik.SO100Kinematics())
 
 	if _, err := m.TeleopInput(func(s *waypointv1.GamepadSnapshot) {

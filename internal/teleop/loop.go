@@ -10,9 +10,11 @@ import (
 	so100v1 "github.com/waypointos/waypoint-so100/protocol/gen/go"
 )
 
-// Sink emits a coordinated multi-joint goal write (implemented by servo.Client).
+// Sink emits a coordinated multi-joint goal write and per-joint moving-speed
+// caps (both implemented by servo.Client).
 type Sink interface {
 	SyncWriteGoals(goals []*so100v1.ServoGoal) error
+	SetGoalSpeed(id uint32, raw uint16) error
 }
 
 type LoopConfig struct {
@@ -23,7 +25,22 @@ type LoopConfig struct {
 	MaxGrip     float64 // rad/s, gripper (joint 6) hold-to-move rate
 	RampPerTick float64 // max change in commanded twist per tick
 	Dt          float64
+	// GoalSpeedHeadroom scales each joint's position-mode moving-speed cap,
+	// written per tick from the angle delta that tick integrates. The servos
+	// power up with GOAL_SPEED=0 (= max speed), so a streamed incremental goal is
+	// chased flat-out, reached in a couple of ms, then the joint sits idle until
+	// the next 50 Hz goal — a per-tick start/stop the operator feels as jitter.
+	// Capping the speed near the rate the reference is actually moving makes the
+	// joint glide between goals instead. The headroom (>1) lets it reach each
+	// goal just before the next tick so it keeps up without lagging; too high and
+	// it arrives early and idles (the buzz returns). Zero disables speed writes
+	// (servos keep their prior cap). Tune on hardware.
+	GoalSpeedHeadroom float64
 }
+
+// stepsPerRad converts a joint rate (rad/s) to the STS3215 GOAL_SPEED unit (raw
+// encoder steps/s): 4096 steps/rev, so ~652 steps/s == 1 rad/s.
+const stepsPerRad = 4096.0 / (2.0 * math.Pi)
 
 type Loop struct {
 	cfg    LoopConfig
@@ -137,6 +154,7 @@ func (l *Loop) tick(now time.Time) {
 	l.prevTwist = cmd.Twist
 
 	goals := make([]*so100v1.ServoGoal, 0, 6)
+	speeds := make([]speedCmd, 0, 6) // moving-speed cap per moved joint, this tick
 
 	// Failsafe 3: IK joints 1..4 from the Cartesian twist, soft-limit clamped.
 	if cmd.Twist != (ik.Twist{}) {
@@ -147,12 +165,14 @@ func (l *Loop) tick(now time.Time) {
 			id := uint32(i + 1)
 			raw := l.cals[id].RawFromRad(q[i])
 			goals = append(goals, &so100v1.ServoGoal{ServoId: id, GoalPosition: uint32(raw)})
+			speeds = append(speeds, speedCmd{id, l.goalSpeed(dq[i])})
 		}
 	}
 
 	// Joint 5 wrist roll: direct hold-to-move rate, clamped to its soft limits.
 	if cmd.WristRoll != 0 {
 		if nrad, goal, ok := l.directJoint(5, q[4], cmd.WristRoll*l.cfg.MaxRoll*l.cfg.Dt); ok {
+			speeds = append(speeds, speedCmd{5, l.goalSpeed(nrad - q[4])})
 			q[4] = nrad
 			goals = append(goals, goal)
 		}
@@ -161,6 +181,7 @@ func (l *Loop) tick(now time.Time) {
 	// Joint 6 gripper: direct hold-to-move rate, clamped to its soft limits.
 	if cmd.Gripper != 0 {
 		if nrad, goal, ok := l.directJoint(6, grip, cmd.Gripper*l.cfg.MaxGrip*l.cfg.Dt); ok {
+			speeds = append(speeds, speedCmd{6, l.goalSpeed(nrad - grip)})
 			grip = nrad
 			goals = append(goals, goal)
 		}
@@ -175,7 +196,35 @@ func (l *Loop) tick(now time.Time) {
 	l.grip = grip
 	l.mu.Unlock()
 
+	// Cap each joint's moving speed to the rate it is integrating before issuing
+	// the goal, so the servo glides to it over the tick instead of snapping there
+	// at full speed and stalling (the per-tick jitter). Speed first, then goal.
+	if l.cfg.GoalSpeedHeadroom > 0 {
+		for _, sp := range speeds {
+			_ = l.sink.SetGoalSpeed(sp.id, sp.raw)
+		}
+	}
+
 	_ = l.sink.SyncWriteGoals(goals)
+}
+
+type speedCmd struct {
+	id  uint32
+	raw uint16
+}
+
+// goalSpeed maps the angle delta a joint integrates this tick to a position-mode
+// moving-speed cap (raw steps/s). It never returns 0: the register reads 0 as
+// "max speed", which is the unbounded dart this whole mechanism exists to avoid.
+func (l *Loop) goalSpeed(dRad float64) uint16 {
+	steps := math.Abs(dRad) / l.cfg.Dt * stepsPerRad * l.cfg.GoalSpeedHeadroom
+	if steps < 1 {
+		return 1
+	}
+	if steps > 32767 { // 15-bit sign-magnitude magnitude ceiling
+		return 32767
+	}
+	return uint16(steps)
 }
 
 // directJoint integrates a non-IK joint (wrist roll, gripper) by dRad from cur,
