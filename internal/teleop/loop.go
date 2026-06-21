@@ -21,6 +21,7 @@ type LoopConfig struct {
 	StaleAfter  time.Duration
 	MaxLinear   float64 // m/s cap on |planar+vertical|
 	MaxPitch    float64 // rad/s cap
+	MaxPan      float64 // rad/s, shoulder pan (joint 1) FPV direct view-sweep rate
 	MaxRoll     float64 // rad/s, wrist roll (joint 5) hold-to-move rate
 	MaxGrip     float64 // rad/s, gripper (joint 6) hold-to-move rate
 	RampPerTick float64 // max change in commanded twist per tick
@@ -156,11 +157,24 @@ func (l *Loop) tick(now time.Time) {
 	goals := make([]*so100v1.ServoGoal, 0, 6)
 	speeds := make([]speedCmd, 0, 6) // moving-speed cap per moved joint, this tick
 
-	// Failsafe 3: IK joints 1..4 from the Cartesian twist, soft-limit clamped.
+	// FPV pan: shoulder_pan (joint 1) is a direct hold-to-move rate that sweeps
+	// the gripper camera. It is intentionally outside IK so "pan is just pan",
+	// and the IK below reads the updated q[0] to resolve reach/pitch in the new
+	// camera heading. Apply it before IK so the solver sees the new heading.
+	if cmd.Pan != 0 {
+		if nrad, goal, ok := l.directJoint(1, q[0], cmd.Pan*l.cfg.MaxPan*l.cfg.Dt); ok {
+			speeds = append(speeds, speedCmd{1, l.goalSpeed(nrad - q[0])})
+			q[0] = nrad
+			goals = append(goals, goal)
+		}
+	}
+
+	// Failsafe 3: IK joints 2..4 from the view-relative twist, soft-limit
+	// clamped. Joint 1 (pan) is handled above and held fixed inside the solver.
 	if cmd.Twist != (ik.Twist{}) {
 		limits := l.softLimits()
 		dq := l.solver.Step(q, cmd.Twist, limits, l.cfg.Dt)
-		for i := 0; i < 4; i++ {
+		for i := 1; i < 4; i++ {
 			q[i] += dq[i]
 			id := uint32(i + 1)
 			raw := l.cals[id].RawFromRad(q[i])
