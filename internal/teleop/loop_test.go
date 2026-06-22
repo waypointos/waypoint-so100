@@ -47,7 +47,8 @@ func missingJointCalibration() map[uint32]calibration.JointCal {
 func testLoopCfg() LoopConfig {
 	return LoopConfig{
 		StaleAfter: 150 * time.Millisecond,
-		MaxLinear:  0.15, MaxPitch: 1.0, MaxRoll: 1.0, MaxGrip: 1.5, RampPerTick: 0.02,
+		MaxLinear:  0.15, MaxPitch: 1.0, MaxPan: 1.0, MaxRoll: 1.0, MaxGrip: 1.5,
+		RampPerTick: 0.02, PanRampPerTick: 0.1,
 		Dt: 0.02, GoalSpeedHeadroom: 1.3,
 	}
 }
@@ -262,9 +263,24 @@ func TestLoop_UncalibratedGripperSkipsJoint6(t *testing.T) {
 		t.Fatalf("expected one sync write, got %d", len(s.goals))
 	}
 	if goalFor(s.goals[0], 1) == nil {
-		t.Fatal("IK joints should still move")
+		t.Fatal("other joints (pan/IK) should still move")
 	}
 	if goalFor(s.goals[0], 6) != nil {
 		t.Fatal("uncalibrated gripper must be skipped")
+	}
+}
+
+// FPV pan (yaw) eases in through the slew limiter instead of jumping to full
+// rate, so a hard stick flick doesn't lurch the arm. After one tick the pan
+// command must be a single ramp step, not the full deadzoned stick value.
+func TestLoop_PanRampsIn(t *testing.T) {
+	s := &recSink{}
+	l := newTestLoop(s)
+	now := time.Now()
+	l.SetInput(&so100v1.GamepadSnapshot{Axes: []float32{0, 0, 1, 0}}, now) // hard right pan, no reach
+	l.tick(now)
+	step := testLoopCfg().PanRampPerTick
+	if l.prevPan <= 0 || l.prevPan > step+1e-9 {
+		t.Fatalf("pan should ease in by one ramp step (%v), got %v", step, l.prevPan)
 	}
 }

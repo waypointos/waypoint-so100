@@ -147,8 +147,13 @@ func setup(m *wpmodule.M) error {
 		// is integrating so streamed goals are glided to, not darted to at the
 		// servos' default max speed (the per-tick start/stop jitter). Tune on
 		// hardware: lower → smoother but laggier, higher → snappier but buzzier.
-		MaxLinear: 0.25, MaxPitch: 1.5, MaxPan: 1.0, MaxRoll: 1.5, MaxGrip: 2.0, RampPerTick: 0.04, Dt: 0.02,
-		GoalSpeedHeadroom: 1.3,
+		MaxLinear: 0.25, MaxPitch: 1.5, MaxPan: 1.0, MaxRoll: 1.5, MaxGrip: 2.0, RampPerTick: 0.04, PanRampPerTick: 0.1, Dt: 0.02,
+		// 1.1 (was 1.3): the servo traverses each per-tick goal in ~Dt/headroom
+		// and idles the rest of the tick — at 1.3 that idle is ~23% of every
+		// tick, a 50 Hz start/stop buzz (worst on the fast single pan joint).
+		// Closer to 1.0 it glides continuously; absolute position goals make the
+		// small phase lag harmless. Tune on hardware.
+		GoalSpeedHeadroom: 1.1,
 	}, sv, cals, ik.SO100Kinematics())
 
 	if _, err := m.TeleopInput(func(s *waypointv1.GamepadSnapshot) {

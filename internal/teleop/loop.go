@@ -24,8 +24,9 @@ type LoopConfig struct {
 	MaxPan      float64 // rad/s, shoulder pan (joint 1) FPV direct view-sweep rate
 	MaxRoll     float64 // rad/s, wrist roll (joint 5) hold-to-move rate
 	MaxGrip     float64 // rad/s, gripper (joint 6) hold-to-move rate
-	RampPerTick float64 // max change in commanded twist per tick
-	Dt          float64
+	RampPerTick    float64 // max change in commanded twist per tick
+	PanRampPerTick float64 // max change in the normalized pan rate per tick (FPV yaw smoothing); <=0 disables
+	Dt             float64
 	// GoalSpeedHeadroom scales each joint's position-mode moving-speed cap,
 	// written per tick from the angle delta that tick integrates. The servos
 	// power up with GOAL_SPEED=0 (= max speed), so a streamed incremental goal is
@@ -57,6 +58,7 @@ type Loop struct {
 	grip      float64    // current gripper estimate (rad), joint 6 (outside the IK chain)
 	halted    bool
 	prevTwist ik.Twist // owned by the tick goroutine
+	prevPan   float64  // owned by the tick goroutine (FPV pan slew state)
 }
 
 func NewLoop(cfg LoopConfig, sink Sink, cals map[uint32]calibration.JointCal, k ik.Kinematics) *Loop {
@@ -135,6 +137,7 @@ func (l *Loop) tick(now time.Time) {
 
 	if halted {
 		l.prevTwist = ik.Twist{} // discard ramp state so resume starts from rest
+		l.prevPan = 0
 		return
 	}
 
@@ -153,6 +156,14 @@ func (l *Loop) tick(now time.Time) {
 	cmd.Twist = clampTwist(cmd.Twist, l.cfg.MaxLinear, l.cfg.MaxPitch)
 	cmd.Twist = ramp(l.prevTwist, cmd.Twist, l.cfg.RampPerTick)
 	l.prevTwist = cmd.Twist
+	// Slew-limit the FPV pan rate too: it is a continuous analog axis (not a
+	// digital hold-to-move like roll/gripper), so easing it in/out stops yaw
+	// from lurching on a stick flick and filters residual stick noise — the
+	// pan-specific half of the jitter. PanRampPerTick<=0 disables it.
+	if l.cfg.PanRampPerTick > 0 {
+		cmd.Pan = slew(l.prevPan, cmd.Pan, l.cfg.PanRampPerTick)
+	}
+	l.prevPan = cmd.Pan
 
 	goals := make([]*so100v1.ServoGoal, 0, 6)
 	speeds := make([]speedCmd, 0, 6) // moving-speed cap per moved joint, this tick
@@ -286,17 +297,24 @@ func clampTwist(v ik.Twist, maxLin, maxPitch float64) ik.Twist {
 	return v
 }
 
-func ramp(prev, want ik.Twist, step float64) ik.Twist {
-	lim := func(p, w float64) float64 {
-		if w-p > step {
-			return p + step
-		}
-		if p-w > step {
-			return p - step
-		}
-		return w
+// slew moves prev toward want by at most step (a per-tick rate limiter).
+func slew(prev, want, step float64) float64 {
+	if want-prev > step {
+		return prev + step
 	}
-	return ik.Twist{Vx: lim(prev.Vx, want.Vx), Vy: lim(prev.Vy, want.Vy), Vz: lim(prev.Vz, want.Vz), Wpitch: lim(prev.Wpitch, want.Wpitch)}
+	if prev-want > step {
+		return prev - step
+	}
+	return want
+}
+
+func ramp(prev, want ik.Twist, step float64) ik.Twist {
+	return ik.Twist{
+		Vx:     slew(prev.Vx, want.Vx, step),
+		Vy:     slew(prev.Vy, want.Vy, step),
+		Vz:     slew(prev.Vz, want.Vz, step),
+		Wpitch: slew(prev.Wpitch, want.Wpitch, step),
+	}
 }
 
 // Run drives tick at the configured rate until stop is closed; wired in main.go.

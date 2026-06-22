@@ -1,6 +1,8 @@
 package teleop
 
 import (
+	"math"
+
 	so100v1 "github.com/waypointos/waypoint-so100/protocol/gen/go"
 	"github.com/waypointos/waypoint-so100/internal/ik"
 )
@@ -34,8 +36,26 @@ func btn(b []bool, i int) float64 {
 	return 0
 }
 
+const stickDeadzone = 0.08 // ignore analog-stick noise near center
+
+// deadzone zeroes |v|<dz and rescales the remainder to a full 0..1 range, so
+// motion eases in smoothly from rest instead of snapping on at the dz edge and
+// so resting stick noise can't drive (and jitter) the joints.
+func deadzone(v, dz float64) float64 {
+	a := math.Abs(v)
+	if a < dz {
+		return 0
+	}
+	s := (a - dz) / (1 - dz)
+	if v < 0 {
+		return -s
+	}
+	return s
+}
+
 func MapInput(s *so100v1.GamepadSnapshot, cfg MapConfig) Command {
-	rx, ry := axis(s.GetAxes(), 2), axis(s.GetAxes(), 3)
+	rx := deadzone(axis(s.GetAxes(), 2), stickDeadzone)
+	ry := deadzone(axis(s.GetAxes(), 3), stickDeadzone)
 	lt, rt := axis(s.GetTriggers(), 0), axis(s.GetTriggers(), 1)
 	// FPV: drive the gripper like an FPV drone — pan to aim the camera, then
 	// reach along the view. Stick X yaws shoulder_pan (sweeps the view); stick Y
