@@ -18,6 +18,7 @@ publish = [
   "waypoint.*.module.so100.joints",
   "waypoint.*.module.so100.stats",
   "waypoint.*.module.so100.calibration",
+  "waypoint.*.module.so100.poses",
 ]
 subscribe = [
   "waypoint.*.module.so100.command",

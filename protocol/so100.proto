@@ -13,8 +13,19 @@ message ArmCommand {
     bool abort              = 2;  // stop the running session, discard, torque off
     bool finish_calibration = 3;  // stop recording, derive + save: zeros from the home pose, soft limits from the sweep
     bool set_home           = 4;  // capture the current pose as the zero (0 rad) for every joint
+    bool        set_torque   = 5;  // true = enable torque on every joint (hold), false = disable (pose by hand)
+    PoseCapture capture_pose = 6;  // save the arm's current physical pose into a slot
+    string      delete_pose  = 7;  // clear the named slot ("share" | "options")
+    string      recall_pose  = 8;  // recall the named slot now (the on-screen teleop button; gamepad recalls the same path)
   }
 }
+
+// capture_pose payload: which slot to bind, and an operator-facing label.
+message PoseCapture { string slot = 1; string name = 2; }
+
+// ---- backend -> tab: which slots hold a pose (Arm tab + teleop legend) ----
+message PoseSlot  { string slot = 1; string name = 2; bool assigned = 3; }
+message PoseState { repeated PoseSlot slots = 1; }
 
 // ---- backend -> tab ----
 message CalibrationState {

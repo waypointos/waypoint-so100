@@ -19,6 +19,7 @@ import (
 	"github.com/waypointos/waypoint-so100/internal/control"
 	"github.com/waypointos/waypoint-so100/internal/ik"
 	"github.com/waypointos/waypoint-so100/internal/jointstate"
+	"github.com/waypointos/waypoint-so100/internal/poses"
 	"github.com/waypointos/waypoint-so100/internal/servobus"
 	"github.com/waypointos/waypoint-so100/internal/teleop"
 	so100v1 "github.com/waypointos/waypoint-so100/protocol/gen/go"
@@ -110,35 +111,9 @@ func setup(m *wpmodule.M) error {
 
 	ctrl := control.New(sv, publish)
 
-	// Private command handler: run calibration in a goroutine so the callback
-	// returns promptly. Coexists with the standard arm.cmd the SDK serves.
-	if _, err := m.Subscribe(m.Subject("command"), func(msg *natsgo.Msg) {
-		var cmd so100v1.ArmCommand
-		if proto.Unmarshal(msg.Data, &cmd) != nil {
-			return
-		}
-		switch {
-		case cmd.GetRunCalibration():
-			ctrl.StartRecording()
-		case cmd.GetSetHome():
-			ctrl.SetHome()
-		case cmd.GetFinishCalibration():
-			ctrl.FinishRecording()
-		case cmd.GetAbort():
-			ctrl.Abort()
-		}
-	}); err != nil {
-		return err
-	}
-
-	// Publish persisted calibration once at boot so the tab shows last state.
-	if loaded, err := calibration.Load(cfg.StatePath); err == nil {
-		publish(loaded, "idle", false)
-		applyCals(loaded)
-	}
-
 	// Teleop: the SDK relays the gamepad stream; convert it to the so100 wire
-	// shape (identical fields) for the IK loop.
+	// shape (identical fields) for the IK loop. Created before the command
+	// handler so torque and pose-recall commands can drive it.
 	loop := teleop.NewLoop(teleop.LoopConfig{
 		StaleAfter: 150 * time.Millisecond,
 		// Rates are tune-on-hardware; opened up from the initial conservative set
@@ -154,7 +129,94 @@ func setup(m *wpmodule.M) error {
 		// Closer to 1.0 it glides continuously; absolute position goals make the
 		// small phase lag harmless. Tune on hardware.
 		GoalSpeedHeadroom: 1.1,
+		// Pose recall glides to the saved pose at a fixed cap (~1.2 rad/s) instead
+		// of the servos' default max speed. Button indices are config-driven; the
+		// loop logs every pressed index at Debug so they can be confirmed on
+		// hardware (the SDK's buttons[] layout is not the raw W3C one).
+		RecallSpeed:   800,
+		ShareButton:   cfg.ShareButton,
+		OptionsButton: cfg.OptionsButton,
 	}, sv, cals, ik.SO100Kinematics())
+
+	// Pose store + publisher: each slot binds raw servo positions captured by hand
+	// (torque off). The poses subject tells the Arm tab and teleop legend which
+	// slots are assigned; the loop reads the live set for gamepad/button recall.
+	posesStore := poses.NewStore(sv, nil)
+	posesSubject := m.Subject("poses")
+	publishPoses := func() {
+		assigned := map[string]poses.Pose{}
+		for _, p := range posesStore.All() {
+			assigned[p.Slot] = p
+		}
+		st := &so100v1.PoseState{}
+		for _, slot := range poses.Slots {
+			p, ok := assigned[slot]
+			st.Slots = append(st.Slots, &so100v1.PoseSlot{Slot: slot, Name: p.Name, Assigned: ok})
+		}
+		if b, err := proto.Marshal(st); err == nil {
+			_ = m.Publish(posesSubject, b)
+		}
+		loop.SetPoses(posesStore.Map())
+	}
+
+	// setTorqueAll holds (true) or releases (false) every joint, so the operator
+	// can pose the arm by hand (off) then lock it (on) from the Arm tab.
+	setTorqueAll := func(on bool) {
+		for _, spec := range calibration.SO100Joints {
+			_ = sv.SetTorqueEnable(spec.ID, on)
+		}
+	}
+
+	// Private command handler: run calibration in a goroutine so the callback
+	// returns promptly. Coexists with the standard arm.cmd the SDK serves. The
+	// type-switch (not a bool switch) is needed to read set_torque's false case.
+	if _, err := m.Subscribe(m.Subject("command"), func(msg *natsgo.Msg) {
+		var cmd so100v1.ArmCommand
+		if proto.Unmarshal(msg.Data, &cmd) != nil {
+			return
+		}
+		switch a := cmd.GetAction().(type) {
+		case *so100v1.ArmCommand_RunCalibration:
+			ctrl.StartRecording()
+		case *so100v1.ArmCommand_SetHome:
+			ctrl.SetHome()
+		case *so100v1.ArmCommand_FinishCalibration:
+			ctrl.FinishRecording()
+		case *so100v1.ArmCommand_Abort:
+			ctrl.Abort()
+		case *so100v1.ArmCommand_SetTorque:
+			setTorqueAll(a.SetTorque)
+		case *so100v1.ArmCommand_CapturePose:
+			if _, err := posesStore.Capture(a.CapturePose.GetSlot(), a.CapturePose.GetName(), order); err != nil {
+				slog.Warn("pose capture failed", "slot", a.CapturePose.GetSlot(), "err", err)
+				return
+			}
+			_ = poses.Save(cfg.PosesPath, posesStore.All())
+			publishPoses()
+		case *so100v1.ArmCommand_DeletePose:
+			posesStore.Delete(a.DeletePose)
+			_ = poses.Save(cfg.PosesPath, posesStore.All())
+			publishPoses()
+		case *so100v1.ArmCommand_RecallPose:
+			go loop.Recall(a.RecallPose)
+		}
+	}); err != nil {
+		return err
+	}
+
+	// Publish persisted calibration once at boot so the tab shows last state.
+	if loaded, err := calibration.Load(cfg.StatePath); err == nil {
+		publish(loaded, "idle", false)
+		applyCals(loaded)
+	}
+
+	// Load persisted poses and publish the slot state once at boot.
+	if loaded, err := poses.Load(cfg.PosesPath); err == nil {
+		for _, p := range loaded {
+			posesStore.Set(p)
+		}
+	}
+	publishPoses()
 
 	if _, err := m.TeleopInput(func(s *waypointv1.GamepadSnapshot) {
 		loop.SetInput(&so100v1.GamepadSnapshot{

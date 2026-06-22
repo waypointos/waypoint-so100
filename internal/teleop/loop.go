@@ -1,8 +1,10 @@
 package teleop
 
 import (
+	"log/slog"
 	"math"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/waypointos/waypoint-so100/internal/calibration"
@@ -10,20 +12,22 @@ import (
 	so100v1 "github.com/waypointos/waypoint-so100/protocol/gen/go"
 )
 
-// Sink emits a coordinated multi-joint goal write and per-joint moving-speed
-// caps (both implemented by servo.Client).
+// Sink emits a coordinated multi-joint goal write, per-joint moving-speed caps,
+// and torque enable (all implemented by servo.Client). Torque enable is used by
+// pose recall, which may run after the operator left torque off to pose by hand.
 type Sink interface {
 	SyncWriteGoals(goals []*so100v1.ServoGoal) error
 	SetGoalSpeed(id uint32, raw uint16) error
+	SetTorqueEnable(id uint32, on bool) error
 }
 
 type LoopConfig struct {
-	StaleAfter  time.Duration
-	MaxLinear   float64 // m/s cap on |planar+vertical|
-	MaxPitch    float64 // rad/s cap
-	MaxPan      float64 // rad/s, shoulder pan (joint 1) FPV direct view-sweep rate
-	MaxRoll     float64 // rad/s, wrist roll (joint 5) hold-to-move rate
-	MaxGrip     float64 // rad/s, gripper (joint 6) hold-to-move rate
+	StaleAfter     time.Duration
+	MaxLinear      float64 // m/s cap on |planar+vertical|
+	MaxPitch       float64 // rad/s cap
+	MaxPan         float64 // rad/s, shoulder pan (joint 1) FPV direct view-sweep rate
+	MaxRoll        float64 // rad/s, wrist roll (joint 5) hold-to-move rate
+	MaxGrip        float64 // rad/s, gripper (joint 6) hold-to-move rate
 	RampPerTick    float64 // max change in commanded twist per tick
 	PanRampPerTick float64 // max change in the normalized pan rate per tick (FPV yaw smoothing); <=0 disables
 	Dt             float64
@@ -38,6 +42,15 @@ type LoopConfig struct {
 	// it arrives early and idles (the buzz returns). Zero disables speed writes
 	// (servos keep their prior cap). Tune on hardware.
 	GoalSpeedHeadroom float64
+	// RecallSpeed is the position-mode moving-speed cap (raw steps/s) used when a
+	// saved pose is recalled, so the arm glides to the pose instead of darting
+	// there at the servos' default max speed. ~800 steps/s ≈ 1.2 rad/s. Tune on
+	// hardware; <=0 leaves the servos' prior cap.
+	RecallSpeed uint16
+	// ShareButton / OptionsButton are the gamepad buttons[] indices whose rising
+	// edge recalls the "share" / "options" pose slots.
+	ShareButton   int
+	OptionsButton int
 }
 
 // stepsPerRad converts a joint rate (rad/s) to the STS3215 GOAL_SPEED unit (raw
@@ -51,14 +64,18 @@ type Loop struct {
 	solver *ik.Solver
 	k      ik.Kinematics
 
-	mu        sync.Mutex
-	last      *so100v1.GamepadSnapshot
-	lastAt    time.Time
-	q         [5]float64 // current joint estimate (rad); q[4] is wrist roll (joint 5)
-	grip      float64    // current gripper estimate (rad), joint 6 (outside the IK chain)
-	halted    bool
-	prevTwist ik.Twist // owned by the tick goroutine
-	prevPan   float64  // owned by the tick goroutine (FPV pan slew state)
+	mu          sync.Mutex
+	last        *so100v1.GamepadSnapshot
+	lastAt      time.Time
+	q           [5]float64 // current joint estimate (rad); q[4] is wrist roll (joint 5)
+	grip        float64    // current gripper estimate (rad), joint 6 (outside the IK chain)
+	halted      bool
+	prevTwist   ik.Twist                     // owned by the tick goroutine
+	prevPan     float64                      // owned by the tick goroutine (FPV pan slew state)
+	prevButtons []bool                       // last seen gamepad buttons, for recall rising-edge detection
+	poses       map[string]map[uint32]uint16 // slot -> servo id -> raw, live pose set for recall
+
+	recalling atomic.Bool // guards a single in-flight recall so a press can't overlap itself
 }
 
 func NewLoop(cfg LoopConfig, sink Sink, cals map[uint32]calibration.JointCal, k ik.Kinematics) *Loop {
@@ -72,6 +89,105 @@ func (l *Loop) SetInput(s *so100v1.GamepadSnapshot, at time.Time) {
 	l.mu.Lock()
 	l.last, l.lastAt = s, at
 	l.halted = false // fresh operator input resumes a halted loop
+	fired := l.poseEdgesLocked(s.GetButtons())
+	l.mu.Unlock()
+	// Recall outside the lock (it re-acquires l.mu) and off this goroutine: the
+	// servo writes must not block the gamepad relay callback.
+	for _, slot := range fired {
+		go l.Recall(slot)
+	}
+}
+
+// poseEdgesLocked returns the slots whose recall button just transitioned from
+// released to pressed since the previous snapshot, and updates prevButtons. Any
+// button going high is logged at Debug so the real Share/Options indices can be
+// confirmed on hardware (the SDK's buttons[] layout is not the raw W3C one).
+// Caller holds l.mu.
+func (l *Loop) poseEdgesLocked(buttons []bool) []string {
+	pressed := func(i int) bool { return i >= 0 && i < len(buttons) && buttons[i] }
+	was := func(i int) bool { return i >= 0 && i < len(l.prevButtons) && l.prevButtons[i] }
+	for i := range buttons {
+		if buttons[i] && !was(i) {
+			slog.Debug("teleop gamepad button down", "index", i)
+		}
+	}
+	var fired []string
+	if pressed(l.cfg.ShareButton) && !was(l.cfg.ShareButton) {
+		fired = append(fired, "share")
+	}
+	if pressed(l.cfg.OptionsButton) && !was(l.cfg.OptionsButton) {
+		fired = append(fired, "options")
+	}
+	l.prevButtons = append(l.prevButtons[:0], buttons...)
+	return fired
+}
+
+// SetPoses swaps the live pose set the recall reads (slot -> servo id -> raw).
+// main pushes a fresh snapshot whenever a pose is captured, deleted, or loaded.
+func (l *Loop) SetPoses(poses map[string]map[uint32]uint16) {
+	l.mu.Lock()
+	l.poses = poses
+	l.mu.Unlock()
+}
+
+// Recall drives joints 1..5 to the raw positions saved in slot, leaving the
+// gripper (joint 6) where it is. Raw goals are written directly (bypassing IK
+// and the rad<->raw round-trip) so replay is exact; the integrated IK estimate
+// is then reseeded to the recalled pose so the next stick input does not snap
+// back. A no-op if the slot is empty, the arm is uncalibrated, or a recall is
+// already in flight. Invoked by the gamepad rising edge and the on-screen button.
+func (l *Loop) Recall(slot string) {
+	if !l.recalling.CompareAndSwap(false, true) {
+		return // a recall is already running
+	}
+	defer l.recalling.Store(false)
+
+	l.mu.Lock()
+	pose := l.poses[slot]
+	l.mu.Unlock()
+	if len(pose) == 0 {
+		return
+	}
+	// Failsafe: refuse to drive an uncalibrated arm, matching the tick path.
+	if !l.calibrated() {
+		slog.Warn("teleop pose recall refused: arm not calibrated", "slot", slot)
+		return
+	}
+
+	goals := make([]*so100v1.ServoGoal, 0, 5)
+	var nq [5]float64
+	var seed [5]bool
+	for _, id := range []uint32{1, 2, 3, 4, 5} { // joints 1..5; gripper (6) untouched
+		raw, ok := pose[id]
+		if !ok {
+			continue
+		}
+		cal, hasCal := l.cals[id]
+		if !hasCal || !cal.OK {
+			continue
+		}
+		_ = l.sink.SetTorqueEnable(id, true) // operator may have left torque off after posing by hand
+		if l.cfg.RecallSpeed > 0 {
+			_ = l.sink.SetGoalSpeed(id, l.cfg.RecallSpeed)
+		}
+		goals = append(goals, &so100v1.ServoGoal{ServoId: id, GoalPosition: uint32(raw)})
+		nq[id-1] = cal.ThetaRad(raw)
+		seed[id-1] = true
+	}
+	if len(goals) == 0 {
+		return
+	}
+	_ = l.sink.SyncWriteGoals(goals)
+
+	// Reseed the IK reference to the recalled pose so a subsequent twist
+	// integrates from where the arm now is, and drop ramp state.
+	l.mu.Lock()
+	for i := 0; i < 5; i++ {
+		if seed[i] {
+			l.q[i] = nq[i]
+		}
+	}
+	l.prevTwist = ik.Twist{}
 	l.mu.Unlock()
 }
 

@@ -11,7 +11,15 @@ import { Arm2DScene, type FlatView } from './Arm2DScene';
 import { JointRail } from './JointRail';
 import { CAMERA_PRESETS, DEFAULT_PRESET, type PresetKey } from './cameraPresets';
 import { SO100_JOINTS, radToDeg, type ServoId } from './joints';
+import { useBridge } from '../bridge';
+import { usePoses } from '../usePoses';
+import { ArmCommand } from '../proto/so100_pb';
 import styles from './ArmTeleop.module.css';
+
+const POSE_SLOTS = [
+  { slot: 'share', label: 'Share' },
+  { slot: 'options', label: 'Options' },
+] as const;
 
 export type JointReading = { angleRad: number | null; naReason: string | null };
 export type Readings = Record<ServoId, JointReading>;
@@ -35,6 +43,14 @@ export function ArmTeleop({ readings, lastAtMs }: { readings: Readings; lastAtMs
   const [flat, setFlat] = useState<FlatView>('side');
   const [opacity, setOpacity] = useState(1);
   const ageMs = useAgeMs(lastAtMs);
+
+  const { roverId, publish } = useBridge();
+  const poses = usePoses();
+  const poseBySlot = new Map((poses?.slots ?? []).map((s) => [s.slot, s]));
+  const recall = (slot: string) => {
+    const cmd = new ArmCommand({ action: { case: 'recallPose', value: slot } });
+    publish(`waypoint.${roverId}.module.so100.command`, cmd.toBinary());
+  };
 
   // URDF render holds N/A joints at rest; the rail carries the reason.
   const pose = useMemo(() => {
@@ -83,6 +99,21 @@ export function ArmTeleop({ readings, lastAtMs }: { readings: Readings; lastAtMs
                   <button key={v} type="button" className={styles.vpBtn}
                     aria-pressed={flat === v} onClick={() => setFlat(v)}>{v}</button>
                 ))}
+          </div>
+          <div className={styles.poseRow} data-testid="pose-recall">
+            <span className={styles.poseLbl}>poses</span>
+            {POSE_SLOTS.map(({ slot, label }) => {
+              const s = poseBySlot.get(slot);
+              const assigned = s?.assigned ?? false;
+              const title = assigned ? (s?.name?.trim() || label) : 'unassigned';
+              return (
+                <button key={slot} type="button" className={styles.poseBtn}
+                  disabled={!assigned} title={title}
+                  data-testid={`pose-recall-${slot}`} onClick={() => recall(slot)}>
+                  {label}
+                </button>
+              );
+            })}
           </div>
         </div>
         <JointRail readings={readings} />

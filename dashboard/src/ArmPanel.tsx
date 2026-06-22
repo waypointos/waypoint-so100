@@ -12,9 +12,11 @@ import { JointRail } from './arm/JointRail';
 import { MotorCards } from './arm/MotorCards';
 import { MotorDetail } from './arm/MotorDetail';
 import { CalibrationCard } from './arm/CalibrationCard';
+import { PosesCard } from './arm/PosesCard';
 import { Panel } from './ui/Panel';
 import { useJoints, useStats, useAgeMs } from './useArmTelemetry';
 import { useCalibration } from './useCalibration';
+import { usePoses } from './usePoses';
 import { SO100_JOINTS, type ServoId } from './arm/joints';
 import styles from './ArmPanel.module.css';
 
@@ -24,6 +26,7 @@ export function ArmPanel() {
   const { readings, lastAtMs } = useJoints();
   const { stats } = useStats();
   const cal = useCalibration();
+  const poses = usePoses();
   const ageMs = useAgeMs(lastAtMs);
 
   // 3D render holds N/A joints at rest; the JOINTS card carries the reason.
@@ -59,6 +62,7 @@ export function ArmPanel() {
           <MotorDetail stats={stats} />
         </Panel>
         <CalibrationCard cal={cal} />
+        <PosesCard poses={poses} />
       </div>
 
       <aside className={styles.rail}>

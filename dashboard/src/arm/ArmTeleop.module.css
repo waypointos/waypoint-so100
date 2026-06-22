@@ -23,6 +23,24 @@
 .vpBtn:hover { color: var(--color-fg-2); }
 .vpBtn[aria-pressed="true"] { color: var(--color-fg); border-color: var(--color-fg-4); }
 
+/* Pose recall: mirror the physical Share/Options gamepad buttons. Bottom-left so
+   it clears the bottom-center preset row. */
+.poseRow {
+  position: absolute; left: 10px; bottom: 8px;
+  display: flex; align-items: center; gap: 2px;
+}
+.poseLbl {
+  color: var(--color-fg-4); font-family: var(--font-mono); font-size: 9px;
+  letter-spacing: 0.1em; text-transform: uppercase; margin-right: 4px;
+}
+.poseBtn {
+  background: var(--color-bg-overlay); border: 1px solid var(--color-border);
+  color: var(--color-fg-3); font-family: var(--font-mono); font-size: 9px;
+  letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; cursor: pointer;
+}
+.poseBtn:hover:not(:disabled) { color: var(--color-fg-2); }
+.poseBtn:disabled { color: var(--color-fg-4); opacity: 0.5; cursor: default; }
+
 .foot {
   flex: none; display: flex; align-items: center; gap: var(--space-lg);
   border-top: 1px solid var(--color-border); padding: 5px var(--space-md);

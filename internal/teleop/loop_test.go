@@ -12,6 +12,7 @@ import (
 type recSink struct {
 	goals  [][]*so100v1.ServoGoal
 	speeds map[uint32]uint16 // last moving-speed cap written per servo
+	torque map[uint32]bool   // last torque-enable written per servo
 }
 
 func (r *recSink) SyncWriteGoals(g []*so100v1.ServoGoal) error {
@@ -24,6 +25,14 @@ func (r *recSink) SetGoalSpeed(id uint32, raw uint16) error {
 		r.speeds = map[uint32]uint16{}
 	}
 	r.speeds[id] = raw
+	return nil
+}
+
+func (r *recSink) SetTorqueEnable(id uint32, on bool) error {
+	if r.torque == nil {
+		r.torque = map[uint32]bool{}
+	}
+	r.torque[id] = on
 	return nil
 }
 

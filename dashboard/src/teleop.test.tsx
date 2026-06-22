@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { act } from 'react';
 import teleop from './teleop';
-import { JointAngles } from './proto/so100_pb';
+import { ArmCommand, JointAngles, PoseSlot, PoseState } from './proto/so100_pb';
 
 function mountWith(deliverRef: { fn: ((b: Uint8Array) => void) | null }) {
   const subjects: string[] = [];
@@ -98,6 +98,59 @@ describe('teleop render window', () => {
     act(() => { btn2d.click(); });
     expect(container.querySelector('[data-arm-2d]')).not.toBeNull();
 
+    act(() => teardown());
+  });
+});
+
+// mountRich captures subscribe callbacks per subject so the poses subject can be
+// delivered independently of the joints subject.
+function mountRich() {
+  const cbs = new Map<string, (b: Uint8Array) => void>();
+  const publish = vi.fn();
+  const ctx = {
+    roverId: 'r1',
+    subscribe: (subject: string, onBytes: (b: Uint8Array) => void) => {
+      cbs.set(subject, onBytes);
+      return () => {};
+    },
+    publish,
+  };
+  const container = document.createElement('div');
+  document.body.appendChild(container);
+  let teardown: () => void = () => {};
+  act(() => { teardown = teleop.mount(container, ctx); });
+  return { cbs, publish, container, teardown };
+}
+
+describe('teleop pose recall', () => {
+  it('recalls a pose on the command subject when the on-screen button is clicked', () => {
+    const { cbs, publish, container, teardown } = mountRich();
+    act(() => {
+      cbs.get('waypoint.r1.module.so100.poses')?.(
+        new PoseState({ slots: [new PoseSlot({ slot: 'share', name: 'reach', assigned: true })] }).toBinary(),
+      );
+    });
+
+    const btn = container.querySelector<HTMLButtonElement>('[data-testid="pose-recall-share"]')!;
+    expect(btn.disabled).toBe(false);
+    act(() => { btn.click(); });
+
+    const call = publish.mock.calls.find((c) => c[0] === 'waypoint.r1.module.so100.command')!;
+    expect(call).toBeTruthy();
+    expect(ArmCommand.fromBinary(call[1] as Uint8Array).action).toEqual({ case: 'recallPose', value: 'share' });
+
+    act(() => teardown());
+  });
+
+  it('disables the recall button for an unassigned slot', () => {
+    const { cbs, container, teardown } = mountRich();
+    act(() => {
+      cbs.get('waypoint.r1.module.so100.poses')?.(
+        new PoseState({ slots: [new PoseSlot({ slot: 'options', assigned: false })] }).toBinary(),
+      );
+    });
+    const btn = container.querySelector<HTMLButtonElement>('[data-testid="pose-recall-options"]')!;
+    expect(btn.disabled).toBe(true);
     act(() => teardown());
   });
 });

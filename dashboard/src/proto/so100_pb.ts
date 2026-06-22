@@ -47,6 +47,38 @@ export class ArmCommand extends Message<ArmCommand> {
      */
     value: boolean;
     case: "setHome";
+  } | {
+    /**
+     * true = enable torque on every joint (hold), false = disable (pose by hand)
+     *
+     * @generated from field: bool set_torque = 5;
+     */
+    value: boolean;
+    case: "setTorque";
+  } | {
+    /**
+     * save the arm's current physical pose into a slot
+     *
+     * @generated from field: waypoint.module.so100.v1.PoseCapture capture_pose = 6;
+     */
+    value: PoseCapture;
+    case: "capturePose";
+  } | {
+    /**
+     * clear the named slot ("share" | "options")
+     *
+     * @generated from field: string delete_pose = 7;
+     */
+    value: string;
+    case: "deletePose";
+  } | {
+    /**
+     * recall the named slot now (the on-screen teleop button; gamepad recalls the same path)
+     *
+     * @generated from field: string recall_pose = 8;
+     */
+    value: string;
+    case: "recallPose";
   } | { case: undefined; value?: undefined } = { case: undefined };
 
   constructor(data?: PartialMessage<ArmCommand>) {
@@ -61,6 +93,10 @@ export class ArmCommand extends Message<ArmCommand> {
     { no: 2, name: "abort", kind: "scalar", T: 8 /* ScalarType.BOOL */, oneof: "action" },
     { no: 3, name: "finish_calibration", kind: "scalar", T: 8 /* ScalarType.BOOL */, oneof: "action" },
     { no: 4, name: "set_home", kind: "scalar", T: 8 /* ScalarType.BOOL */, oneof: "action" },
+    { no: 5, name: "set_torque", kind: "scalar", T: 8 /* ScalarType.BOOL */, oneof: "action" },
+    { no: 6, name: "capture_pose", kind: "message", T: PoseCapture, oneof: "action" },
+    { no: 7, name: "delete_pose", kind: "scalar", T: 9 /* ScalarType.STRING */, oneof: "action" },
+    { no: 8, name: "recall_pose", kind: "scalar", T: 9 /* ScalarType.STRING */, oneof: "action" },
   ]);
 
   static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): ArmCommand {
@@ -77,6 +113,139 @@ export class ArmCommand extends Message<ArmCommand> {
 
   static equals(a: ArmCommand | PlainMessage<ArmCommand> | undefined, b: ArmCommand | PlainMessage<ArmCommand> | undefined): boolean {
     return proto3.util.equals(ArmCommand, a, b);
+  }
+}
+
+/**
+ * capture_pose payload: which slot to bind, and an operator-facing label.
+ *
+ * @generated from message waypoint.module.so100.v1.PoseCapture
+ */
+export class PoseCapture extends Message<PoseCapture> {
+  /**
+   * @generated from field: string slot = 1;
+   */
+  slot = "";
+
+  /**
+   * @generated from field: string name = 2;
+   */
+  name = "";
+
+  constructor(data?: PartialMessage<PoseCapture>) {
+    super();
+    proto3.util.initPartial(data, this);
+  }
+
+  static readonly runtime: typeof proto3 = proto3;
+  static readonly typeName = "waypoint.module.so100.v1.PoseCapture";
+  static readonly fields: FieldList = proto3.util.newFieldList(() => [
+    { no: 1, name: "slot", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 2, name: "name", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+  ]);
+
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): PoseCapture {
+    return new PoseCapture().fromBinary(bytes, options);
+  }
+
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): PoseCapture {
+    return new PoseCapture().fromJson(jsonValue, options);
+  }
+
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): PoseCapture {
+    return new PoseCapture().fromJsonString(jsonString, options);
+  }
+
+  static equals(a: PoseCapture | PlainMessage<PoseCapture> | undefined, b: PoseCapture | PlainMessage<PoseCapture> | undefined): boolean {
+    return proto3.util.equals(PoseCapture, a, b);
+  }
+}
+
+/**
+ * ---- backend -> tab: which slots hold a pose (Arm tab + teleop legend) ----
+ *
+ * @generated from message waypoint.module.so100.v1.PoseSlot
+ */
+export class PoseSlot extends Message<PoseSlot> {
+  /**
+   * @generated from field: string slot = 1;
+   */
+  slot = "";
+
+  /**
+   * @generated from field: string name = 2;
+   */
+  name = "";
+
+  /**
+   * @generated from field: bool assigned = 3;
+   */
+  assigned = false;
+
+  constructor(data?: PartialMessage<PoseSlot>) {
+    super();
+    proto3.util.initPartial(data, this);
+  }
+
+  static readonly runtime: typeof proto3 = proto3;
+  static readonly typeName = "waypoint.module.so100.v1.PoseSlot";
+  static readonly fields: FieldList = proto3.util.newFieldList(() => [
+    { no: 1, name: "slot", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 2, name: "name", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 3, name: "assigned", kind: "scalar", T: 8 /* ScalarType.BOOL */ },
+  ]);
+
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): PoseSlot {
+    return new PoseSlot().fromBinary(bytes, options);
+  }
+
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): PoseSlot {
+    return new PoseSlot().fromJson(jsonValue, options);
+  }
+
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): PoseSlot {
+    return new PoseSlot().fromJsonString(jsonString, options);
+  }
+
+  static equals(a: PoseSlot | PlainMessage<PoseSlot> | undefined, b: PoseSlot | PlainMessage<PoseSlot> | undefined): boolean {
+    return proto3.util.equals(PoseSlot, a, b);
+  }
+}
+
+/**
+ * @generated from message waypoint.module.so100.v1.PoseState
+ */
+export class PoseState extends Message<PoseState> {
+  /**
+   * @generated from field: repeated waypoint.module.so100.v1.PoseSlot slots = 1;
+   */
+  slots: PoseSlot[] = [];
+
+  constructor(data?: PartialMessage<PoseState>) {
+    super();
+    proto3.util.initPartial(data, this);
+  }
+
+  static readonly runtime: typeof proto3 = proto3;
+  static readonly typeName = "waypoint.module.so100.v1.PoseState";
+  static readonly fields: FieldList = proto3.util.newFieldList(() => [
+    { no: 1, name: "slots", kind: "message", T: PoseSlot, repeated: true },
+  ]);
+
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): PoseState {
+    return new PoseState().fromBinary(bytes, options);
+  }
+
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): PoseState {
+    return new PoseState().fromJson(jsonValue, options);
+  }
+
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): PoseState {
+    return new PoseState().fromJsonString(jsonString, options);
+  }
+
+  static equals(a: PoseState | PlainMessage<PoseState> | undefined, b: PoseState | PlainMessage<PoseState> | undefined): boolean {
+    return proto3.util.equals(PoseState, a, b);
   }
 }
 

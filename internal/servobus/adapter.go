@@ -32,6 +32,9 @@ func (a *Adapter) SetGoalSpeed(id uint32, raw uint16) error {
 }
 func (a *Adapter) EnableTorque(id uint32) error  { return a.sv.SetTorqueEnable(id, true) }
 func (a *Adapter) DisableTorque(id uint32) error { return a.sv.SetTorqueEnable(id, false) }
+func (a *Adapter) SetTorqueEnable(id uint32, on bool) error {
+	return a.sv.SetTorqueEnable(id, on)
+}
 func (a *Adapter) SetGoalPosition(id uint32, raw uint16) error {
 	return a.sv.SetGoalPosition(id, uint32(raw))
 }

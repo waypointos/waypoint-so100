@@ -4,6 +4,7 @@
 // ctx: { roverId, tokens, subscribe(subject, onBytes), publish(subject, bytes) }
 import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { BridgeProvider } from './bridge';
 import { JointAngles } from './proto/so100_pb';
 import { ArmTeleop, type Readings } from './arm/ArmTeleop';
 import { SO100_JOINTS, type ServoId } from './arm/joints';
@@ -14,6 +15,10 @@ type ModuleContext = {
   subscribe: (subject: string, onBytes: (b: Uint8Array) => void) => () => void;
   publish?: (subject: string, bytes: Uint8Array) => void;
 };
+
+// publish is optional in the teleop ctx; fall back to a no-op so the recall
+// buttons render (disabled paths still work) even without a publish channel.
+const noopPublish = () => {};
 
 const AWAITING: Readings = Object.fromEntries(
   SO100_JOINTS.map((j) => [j.id, { angleRad: null, naReason: 'awaiting telemetry' }]),
@@ -39,7 +44,11 @@ function ArmTeleopWindow({ ctx }: { ctx: ModuleContext }) {
     });
   }, [ctx]);
 
-  return <ArmTeleop readings={readings} lastAtMs={lastAtMs} />;
+  return (
+    <BridgeProvider value={{ roverId: ctx.roverId, subscribe: ctx.subscribe, publish: ctx.publish ?? noopPublish }}>
+      <ArmTeleop readings={readings} lastAtMs={lastAtMs} />
+    </BridgeProvider>
+  );
 }
 
 export default {
