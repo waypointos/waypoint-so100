@@ -31,17 +31,6 @@ type LoopConfig struct {
 	RampPerTick    float64 // max change in commanded twist per tick
 	PanRampPerTick float64 // max change in the normalized pan rate per tick (FPV yaw smoothing); <=0 disables
 	Dt             float64
-	// GoalSpeedHeadroom scales each joint's position-mode moving-speed cap,
-	// written per tick from the angle delta that tick integrates. The servos
-	// power up with GOAL_SPEED=0 (= max speed), so a streamed incremental goal is
-	// chased flat-out, reached in a couple of ms, then the joint sits idle until
-	// the next 50 Hz goal — a per-tick start/stop the operator feels as jitter.
-	// Capping the speed near the rate the reference is actually moving makes the
-	// joint glide between goals instead. The headroom (>1) lets it reach each
-	// goal just before the next tick so it keeps up without lagging; too high and
-	// it arrives early and idles (the buzz returns). Zero disables speed writes
-	// (servos keep their prior cap). Tune on hardware.
-	GoalSpeedHeadroom float64
 	// RecallSpeed is the position-mode moving-speed cap (raw steps/s) used when a
 	// saved pose is recalled, so the arm glides to the pose instead of darting
 	// there at the servos' default max speed. ~800 steps/s ≈ 1.2 rad/s. Tune on
@@ -52,10 +41,6 @@ type LoopConfig struct {
 	ShareButton   int
 	OptionsButton int
 }
-
-// stepsPerRad converts a joint rate (rad/s) to the STS3215 GOAL_SPEED unit (raw
-// encoder steps/s): 4096 steps/rev, so ~652 steps/s == 1 rad/s.
-const stepsPerRad = 4096.0 / (2.0 * math.Pi)
 
 type Loop struct {
 	cfg    LoopConfig
@@ -74,6 +59,11 @@ type Loop struct {
 	prevPan     float64                      // owned by the tick goroutine (FPV pan slew state)
 	prevButtons []bool                       // last seen gamepad buttons, for recall rising-edge detection
 	poses       map[string]map[uint32]uint16 // slot -> servo id -> raw, live pose set for recall
+
+	// goalSpeedDirty is set when a pose recall left a reduced moving-speed cap on
+	// the joints; the next teleop motion clears it back to max (0) so streamed
+	// goals are not throttled (the acceleration register now governs smoothness).
+	goalSpeedDirty bool
 
 	recalling atomic.Bool // guards a single in-flight recall so a press can't overlap itself
 }
@@ -180,7 +170,9 @@ func (l *Loop) Recall(slot string) {
 	_ = l.sink.SyncWriteGoals(goals)
 
 	// Reseed the IK reference to the recalled pose so a subsequent twist
-	// integrates from where the arm now is, and drop ramp state.
+	// integrates from where the arm now is, and drop ramp state. Mark the
+	// moving-speed cap dirty so the next teleop motion clears the recall speed
+	// back to max (see tick).
 	l.mu.Lock()
 	for i := 0; i < 5; i++ {
 		if seed[i] {
@@ -188,6 +180,9 @@ func (l *Loop) Recall(slot string) {
 		}
 	}
 	l.prevTwist = ik.Twist{}
+	if l.cfg.RecallSpeed > 0 {
+		l.goalSpeedDirty = true
+	}
 	l.mu.Unlock()
 }
 
@@ -223,6 +218,17 @@ func (l *Loop) SetGripEstimate(rad float64) {
 		l.grip = rad
 	}
 	l.mu.Unlock()
+}
+
+// Estimate returns the integrated joint estimate (rad; q[0..4] = joints 1..5,
+// grip = joint 6) and whether teleop is actively commanding. While active, the
+// joints publisher should render this instead of reading the servo bus, so the
+// 50 Hz goal stream is not starved by position reads (the reads would be
+// discarded by the reseed gate anyway).
+func (l *Loop) Estimate() (q [5]float64, grip float64, active bool) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.q, l.grip, !l.seedAllowedLocked()
 }
 
 // seedAllowedLocked reports whether the sensor may overwrite the integrated
@@ -282,7 +288,6 @@ func (l *Loop) tick(now time.Time) {
 	l.prevPan = cmd.Pan
 
 	goals := make([]*so100v1.ServoGoal, 0, 6)
-	speeds := make([]speedCmd, 0, 6) // moving-speed cap per moved joint, this tick
 
 	// FPV pan: shoulder_pan (joint 1) is a direct hold-to-move rate that sweeps
 	// the gripper camera. It is intentionally outside IK so "pan is just pan",
@@ -290,7 +295,6 @@ func (l *Loop) tick(now time.Time) {
 	// camera heading. Apply it before IK so the solver sees the new heading.
 	if cmd.Pan != 0 {
 		if nrad, goal, ok := l.directJoint(1, q[0], cmd.Pan*l.cfg.MaxPan*l.cfg.Dt); ok {
-			speeds = append(speeds, speedCmd{1, l.goalSpeed(nrad - q[0])})
 			q[0] = nrad
 			goals = append(goals, goal)
 		}
@@ -306,14 +310,12 @@ func (l *Loop) tick(now time.Time) {
 			id := uint32(i + 1)
 			raw := l.cals[id].RawFromRad(q[i])
 			goals = append(goals, &so100v1.ServoGoal{ServoId: id, GoalPosition: uint32(raw)})
-			speeds = append(speeds, speedCmd{id, l.goalSpeed(dq[i])})
 		}
 	}
 
 	// Joint 5 wrist roll: direct hold-to-move rate, clamped to its soft limits.
 	if cmd.WristRoll != 0 {
 		if nrad, goal, ok := l.directJoint(5, q[4], cmd.WristRoll*l.cfg.MaxRoll*l.cfg.Dt); ok {
-			speeds = append(speeds, speedCmd{5, l.goalSpeed(nrad - q[4])})
 			q[4] = nrad
 			goals = append(goals, goal)
 		}
@@ -322,7 +324,6 @@ func (l *Loop) tick(now time.Time) {
 	// Joint 6 gripper: direct hold-to-move rate, clamped to its soft limits.
 	if cmd.Gripper != 0 {
 		if nrad, goal, ok := l.directJoint(6, grip, cmd.Gripper*l.cfg.MaxGrip*l.cfg.Dt); ok {
-			speeds = append(speeds, speedCmd{6, l.goalSpeed(nrad - grip)})
 			grip = nrad
 			goals = append(goals, goal)
 		}
@@ -335,37 +336,21 @@ func (l *Loop) tick(now time.Time) {
 	l.mu.Lock()
 	l.q = q
 	l.grip = grip
+	dirty := l.goalSpeedDirty
+	l.goalSpeedDirty = false
 	l.mu.Unlock()
 
-	// Cap each joint's moving speed to the rate it is integrating before issuing
-	// the goal, so the servo glides to it over the tick instead of snapping there
-	// at full speed and stalling (the per-tick jitter). Speed first, then goal.
-	if l.cfg.GoalSpeedHeadroom > 0 {
-		for _, sp := range speeds {
-			_ = l.sink.SetGoalSpeed(sp.id, sp.raw)
+	// A prior pose recall left a reduced moving-speed cap on these joints. Clear
+	// it back to max (0) on the first teleop motion so the streamed goals are not
+	// throttled — smoothness now comes from the servos' acceleration register
+	// (set once at startup), not a per-tick speed cap.
+	if dirty {
+		for _, g := range goals {
+			_ = l.sink.SetGoalSpeed(g.GetServoId(), 0)
 		}
 	}
 
 	_ = l.sink.SyncWriteGoals(goals)
-}
-
-type speedCmd struct {
-	id  uint32
-	raw uint16
-}
-
-// goalSpeed maps the angle delta a joint integrates this tick to a position-mode
-// moving-speed cap (raw steps/s). It never returns 0: the register reads 0 as
-// "max speed", which is the unbounded dart this whole mechanism exists to avoid.
-func (l *Loop) goalSpeed(dRad float64) uint16 {
-	steps := math.Abs(dRad) / l.cfg.Dt * stepsPerRad * l.cfg.GoalSpeedHeadroom
-	if steps < 1 {
-		return 1
-	}
-	if steps > 32767 { // 15-bit sign-magnitude magnitude ceiling
-		return 32767
-	}
-	return uint16(steps)
 }
 
 // directJoint integrates a non-IK joint (wrist roll, gripper) by dRad from cur,

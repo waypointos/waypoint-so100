@@ -118,17 +118,11 @@ func setup(m *wpmodule.M) error {
 		StaleAfter: 150 * time.Millisecond,
 		// Rates are tune-on-hardware; opened up from the initial conservative set
 		// once the reference-reseed jitter (SetJointEstimate gating) was fixed.
-		// GoalSpeedHeadroom caps each joint's moving speed near the rate the loop
-		// is integrating so streamed goals are glided to, not darted to at the
-		// servos' default max speed (the per-tick start/stop jitter). Tune on
-		// hardware: lower → smoother but laggier, higher → snappier but buzzier.
+		// Smoothness now comes from the servos' control-loop tuning applied once
+		// at startup (low position-loop P + high acceleration; see applyServoTuning
+		// and config.ServoTuning), so the loop just streams goal positions at max
+		// speed instead of re-capping GOAL_SPEED every tick.
 		MaxLinear: 0.25, MaxPitch: 1.5, MaxPan: 1.0, MaxRoll: 1.5, MaxGrip: 2.0, RampPerTick: 0.04, PanRampPerTick: 0.1, Dt: 0.02,
-		// 1.1 (was 1.3): the servo traverses each per-tick goal in ~Dt/headroom
-		// and idles the rest of the tick — at 1.3 that idle is ~23% of every
-		// tick, a 50 Hz start/stop buzz (worst on the fast single pan joint).
-		// Closer to 1.0 it glides continuously; absolute position goals make the
-		// small phase lag harmless. Tune on hardware.
-		GoalSpeedHeadroom: 1.1,
 		// Pose recall glides to the saved pose at a fixed cap (~1.2 rad/s) instead
 		// of the servos' default max speed. Button indices are config-driven; the
 		// loop logs every pressed index at Debug so they can be confirmed on
@@ -235,6 +229,13 @@ func setup(m *wpmodule.M) error {
 
 	go loop.Run(m.Done())
 
+	// Apply the one-time servo control-loop tuning once the bus is reachable, so
+	// streamed goal positions glide instead of dart-and-stall (the teleop jitter
+	// fix). Done off the startup path and gated on a successful read so it waits
+	// for core + the servo-control broker to come up; EEPROM-backed gains persist,
+	// SRAM acceleration is re-applied every boot.
+	go applyServoTuning(m, sv, cfg.Tuning, order)
+
 	// 33 ms joint-angle publisher feeds the private joints subject (panel).
 	go func() {
 		t := time.NewTicker(33 * time.Millisecond)
@@ -248,6 +249,17 @@ func setup(m *wpmodule.M) error {
 				// sweeping; two readers at ~30 Hz starve the long wrist/gripper
 				// chain and surface as "no read".
 				if ctrl.Recording() {
+					continue
+				}
+				// While teleop is actively commanding, don't read the servo bus:
+				// the 50 Hz goal stream needs it, and the reads would be discarded
+				// by the reseed gate anyway. Publish the loop's integrated estimate
+				// so the panel still shows live angles without bus contention.
+				if q, grip, active := loop.Estimate(); active {
+					ja := jointAnglesFromEstimate(order, q, grip, cals)
+					if b, err := proto.Marshal(ja); err == nil {
+						_ = m.Publish(m.Subject("joints"), b)
+					}
 					continue
 				}
 				ja := jointstate.BuildJointAngles([]uint32{1, 2, 3, 4, 5, 6}, sv, cals)
@@ -312,4 +324,59 @@ func gripEstimateFrom(ja *so100v1.JointAngles) (float64, bool) {
 		}
 	}
 	return 0, false
+}
+
+// jointAnglesFromEstimate renders the teleop loop's integrated joint estimate
+// (rad) as JointAngles for the panel during active teleop, so live angles keep
+// updating without the servo-bus reads competing with the goal stream. q[0..4]
+// are joints 1..5; grip is joint 6. A joint with no calibration is emitted N/A.
+func jointAnglesFromEstimate(order []uint32, q [5]float64, grip float64, cals map[uint32]calibration.JointCal) *so100v1.JointAngles {
+	ja := &so100v1.JointAngles{}
+	for _, id := range order {
+		j := &so100v1.Joint{Id: id}
+		if _, ok := cals[id]; ok {
+			rad := grip
+			if id >= 1 && id <= 5 {
+				rad = q[id-1]
+			}
+			j.AngleRad = proto.Float32(float32(rad))
+		} else {
+			j.NaReason = "uncalibrated"
+		}
+		ja.Joints = append(ja.Joints, j)
+	}
+	return ja
+}
+
+// applyServoTuning waits until the servo bus answers a read (core and the servo
+// broker are up), then writes the one-time control-loop tuning to every joint.
+// Best-effort and idempotent: EEPROM-backed gains persist across boots, SRAM
+// acceleration is restored each boot. Gives up after a bounded wait.
+func applyServoTuning(m *wpmodule.M, sv *servobus.Adapter, t config.ServoTuning, order []uint32) {
+	tn := wpmodule.Tuning{
+		PCoefficient:    proto.Uint32(t.PCoefficient),
+		ICoefficient:    proto.Uint32(t.ICoefficient),
+		DCoefficient:    proto.Uint32(t.DCoefficient),
+		Acceleration:    proto.Uint32(t.Acceleration),
+		MaxAcceleration: proto.Uint32(t.MaxAcceleration),
+		ReturnDelay:     proto.Uint32(t.ReturnDelay),
+	}
+	for attempt := 0; attempt < 10; attempt++ {
+		if _, err := sv.Read(order[0]); err == nil {
+			for _, id := range order {
+				if err := sv.SetTuning(id, tn); err != nil {
+					slog.Warn("servo tuning write failed", "id", id, "err", err)
+				}
+			}
+			slog.Info("servo control-loop tuning applied",
+				"p", t.PCoefficient, "accel", t.Acceleration, "return_delay", t.ReturnDelay)
+			return
+		}
+		select {
+		case <-m.Done():
+			return
+		case <-time.After(500 * time.Millisecond):
+		}
+	}
+	slog.Warn("servo tuning skipped: bus not reachable at startup")
 }

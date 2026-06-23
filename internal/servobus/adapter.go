@@ -30,6 +30,12 @@ func (a *Adapter) SetAngleLimits(id uint32, min, max uint16) error {
 func (a *Adapter) SetGoalSpeed(id uint32, raw uint16) error {
 	return a.sv.SetGoalSpeed(id, uint32(raw))
 }
+
+// SetTuning writes the servo's control-loop tuning (PID gains, accel, bus
+// delay) once at startup. Forwards to the SDK; nil fields are left unchanged.
+func (a *Adapter) SetTuning(id uint32, t wpmodule.Tuning) error {
+	return a.sv.SetTuning(id, t)
+}
 func (a *Adapter) EnableTorque(id uint32) error  { return a.sv.SetTorqueEnable(id, true) }
 func (a *Adapter) DisableTorque(id uint32) error { return a.sv.SetTorqueEnable(id, false) }
 func (a *Adapter) SetTorqueEnable(id uint32, on bool) error {

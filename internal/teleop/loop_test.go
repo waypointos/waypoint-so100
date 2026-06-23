@@ -58,7 +58,7 @@ func testLoopCfg() LoopConfig {
 		StaleAfter: 150 * time.Millisecond,
 		MaxLinear:  0.15, MaxPitch: 1.0, MaxPan: 1.0, MaxRoll: 1.0, MaxGrip: 1.5,
 		RampPerTick: 0.02, PanRampPerTick: 0.1,
-		Dt: 0.02, GoalSpeedHeadroom: 1.3,
+		Dt: 0.02,
 	}
 }
 
@@ -184,43 +184,22 @@ func TestLoop_WristRollClampedToSoftLimit(t *testing.T) {
 	}
 }
 
-// Each moved joint gets a finite moving-speed cap written before its goal, so
-// the servo glides rather than darting at its default max speed. A zero cap
-// (the register's "max speed") would be the jitter this guards against.
-func TestLoop_WritesFiniteGoalSpeed(t *testing.T) {
+// Normal teleop motion must not touch the moving-speed registers: smoothness
+// now comes from the servos' startup control-loop tuning (low P + high accel),
+// and re-capping GOAL_SPEED every tick is the profile-restart jitter we removed.
+func TestLoop_NoGoalSpeedDuringTeleop(t *testing.T) {
 	s := &recSink{}
 	l := newTestLoop(s)
 	now := time.Now()
 	l.SetInput(&so100v1.GamepadSnapshot{Axes: []float32{0, 0, 1, -1}, Triggers: []float32{0, 0}}, now)
-	// Ramp a few ticks so the twist (and thus the per-joint deltas) is non-trivial.
 	for i := 0; i < 5; i++ {
 		l.tick(now)
 	}
-	if len(s.speeds) == 0 {
-		t.Fatal("expected per-joint moving-speed caps to be written")
-	}
-	for id, raw := range s.speeds {
-		if raw == 0 {
-			t.Fatalf("joint %d speed cap is 0 (= servo max speed); must be finite", id)
-		}
-	}
-}
-
-// With headroom disabled the loop must not touch the speed registers, leaving
-// the servos at whatever cap they already hold (back-compat / opt-out).
-func TestLoop_NoGoalSpeedWhenHeadroomZero(t *testing.T) {
-	s := &recSink{}
-	cfg := testLoopCfg()
-	cfg.GoalSpeedHeadroom = 0
-	l := NewLoop(cfg, s, fixedCalibration(), SO100KinematicsForTest())
-	now := time.Now()
-	l.SetInput(&so100v1.GamepadSnapshot{Axes: []float32{0, 0, 1, -1}, Triggers: []float32{0, 0}}, now)
-	l.tick(now)
 	if len(s.goals) == 0 {
 		t.Fatal("expected motion")
 	}
 	if len(s.speeds) != 0 {
-		t.Fatalf("headroom 0 must write no speed caps; got %d", len(s.speeds))
+		t.Fatalf("teleop must not write goal-speed caps; got %d", len(s.speeds))
 	}
 }
 
