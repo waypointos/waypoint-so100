@@ -26,16 +26,14 @@ jobs:
       - run: cd dashboard && pnpm test
       - run: cd dashboard && pnpm build
 
-  # Skipped on fork and Dependabot PRs; the dashboard job still covers those.
   go:
-    if: >-
-      github.actor != 'dependabot[bot]' &&
-      (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           persist-credentials: false
+      # go.mod replaces the waypoint SDK modules with ../waypoint; clone the
+      # public monorepo as a sibling of the workspace.
       - name: Checkout waypoint SDK (sibling)
         run: |
           set -euo pipefail
