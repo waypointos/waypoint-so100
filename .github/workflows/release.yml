@@ -7,8 +7,7 @@ permissions: {}
 
 jobs:
   # Runs all third-party build code (pnpm postinstalls, Go toolchain) with no
-  # privileges: no OIDC identity, no writable token, and the deploy key is
-  # removed as soon as the SDK clone lands.
+  # privileges: no OIDC identity and no writable token.
   build:
     runs-on: ubuntu-latest
     permissions:
@@ -23,23 +22,12 @@ jobs:
           [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
             echo "tag '$GITHUB_REF_NAME' is not vMAJOR.MINOR.PATCH" >&2; exit 1; }
           echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
-      # go.mod replaces the waypoint SDK modules with ../waypoint; clone it as a
-      # sibling of the workspace using a read-only deploy key on that repo. Host
-      # keys come from the TLS-authenticated GitHub meta API, not first-use
-      # ssh-keyscan, and the key file only exists for the duration of the clone.
+      # go.mod replaces the waypoint SDK modules with ../waypoint; clone the
+      # public monorepo as a sibling of the workspace.
       - name: Checkout waypoint SDK (sibling)
-        env:
-          WAYPOINT_SSH_KEY: ${{ secrets.WAYPOINT_SSH_KEY }}
         run: |
           set -euo pipefail
-          mkdir -p ~/.ssh
-          curl -fsSL https://api.github.com/meta \
-            | jq -r '.ssh_keys[] | "github.com \(.)"' >> ~/.ssh/known_hosts
-          printf '%s\n' "$WAYPOINT_SSH_KEY" > ~/.ssh/waypoint_deploy
-          chmod 600 ~/.ssh/waypoint_deploy
-          GIT_SSH_COMMAND="ssh -i ~/.ssh/waypoint_deploy -o IdentitiesOnly=yes" \
-            git clone --depth 1 git@github.com:batuergun/waypoint.git "${GITHUB_WORKSPACE}/../waypoint"
-          rm -f ~/.ssh/waypoint_deploy
+          git clone --depth 1 https://github.com/waypointos/waypoint.git "${GITHUB_WORKSPACE}/../waypoint"
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go.mod

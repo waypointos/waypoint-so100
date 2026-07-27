@@ -26,9 +26,7 @@ jobs:
       - run: cd dashboard && pnpm test
       - run: cd dashboard && pnpm build
 
-  # Needs the read-only waypoint deploy key, so it cannot run on fork PRs or
-  # Dependabot PRs (secrets are unavailable or scoped differently there); the
-  # dashboard job still covers those.
+  # Skipped on fork and Dependabot PRs; the dashboard job still covers those.
   go:
     if: >-
       github.actor != 'dependabot[bot]' &&
@@ -39,18 +37,9 @@ jobs:
         with:
           persist-credentials: false
       - name: Checkout waypoint SDK (sibling)
-        env:
-          WAYPOINT_SSH_KEY: ${{ secrets.WAYPOINT_SSH_KEY }}
         run: |
           set -euo pipefail
-          mkdir -p ~/.ssh
-          curl -fsSL https://api.github.com/meta \
-            | jq -r '.ssh_keys[] | "github.com \(.)"' >> ~/.ssh/known_hosts
-          printf '%s\n' "$WAYPOINT_SSH_KEY" > ~/.ssh/waypoint_deploy
-          chmod 600 ~/.ssh/waypoint_deploy
-          GIT_SSH_COMMAND="ssh -i ~/.ssh/waypoint_deploy -o IdentitiesOnly=yes" \
-            git clone --depth 1 git@github.com:batuergun/waypoint.git "${GITHUB_WORKSPACE}/../waypoint"
-          rm -f ~/.ssh/waypoint_deploy
+          git clone --depth 1 https://github.com/waypointos/waypoint.git "${GITHUB_WORKSPACE}/../waypoint"
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go.mod
