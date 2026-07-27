@@ -60,3 +60,14 @@ go run ./cmd/waypoint-module-so100
 Confirm `module.so100.arm.state` traffic on the rover's bus (`nats sub` on the
 dev NATS, or the dashboard Bus pane). This is the hardware-day verification step
 when a dev rover is available.
+
+## Releases
+
+Tagged releases ship a signed `.raw` module image; see [SECURITY.md](SECURITY.md)
+for the cosign verification command and for how to report a vulnerability.
+
+## License
+
+Apache-2.0, see [LICENSE](LICENSE) and [NOTICE](NOTICE). The vendored SO-101
+mesh assets under `dashboard/public/models/so101/` carry their own license and
+attribution alongside the files.

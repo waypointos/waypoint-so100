@@ -1,0 +1,14 @@
+Waypoint SO-100 Module
+Copyright 2026 Batu Ergun
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use the files in this project except in compliance with the
+License. You may obtain a copy of the License in the LICENSE file or at:
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+--------------------------------------------------------------------------------
+
+dashboard/public/models/so101/ bundles mesh assets derived from The Robot
+Studio's SO-ARM100 project; see the README.md and LICENSE in that directory
+for source, copyright, and modification details.
