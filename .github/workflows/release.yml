@@ -3,28 +3,43 @@ on:
   push:
     tags: ['v*']
 
-permissions:
-  contents: write
-  id-token: write   # cosign keyless OIDC; the proxy pins this workflow's SAN
+permissions: {}
 
 jobs:
+  # Runs all third-party build code (pnpm postinstalls, Go toolchain) with no
+  # privileges: no OIDC identity, no writable token, and the deploy key is
+  # removed as soon as the SDK clone lands.
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+      - name: Validate tag
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+            echo "tag '$GITHUB_REF_NAME' is not vMAJOR.MINOR.PATCH" >&2; exit 1; }
+          echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
       # go.mod replaces the waypoint SDK modules with ../waypoint; clone it as a
-      # sibling of the workspace using a read-only deploy key on that repo.
+      # sibling of the workspace using a read-only deploy key on that repo. Host
+      # keys come from the TLS-authenticated GitHub meta API, not first-use
+      # ssh-keyscan, and the key file only exists for the duration of the clone.
       - name: Checkout waypoint SDK (sibling)
         env:
           WAYPOINT_SSH_KEY: ${{ secrets.WAYPOINT_SSH_KEY }}
         run: |
           set -euo pipefail
           mkdir -p ~/.ssh
+          curl -fsSL https://api.github.com/meta \
+            | jq -r '.ssh_keys[] | "github.com \(.)"' >> ~/.ssh/known_hosts
           printf '%s\n' "$WAYPOINT_SSH_KEY" > ~/.ssh/waypoint_deploy
           chmod 600 ~/.ssh/waypoint_deploy
-          ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
           GIT_SSH_COMMAND="ssh -i ~/.ssh/waypoint_deploy -o IdentitiesOnly=yes" \
             git clone --depth 1 git@github.com:batuergun/waypoint.git "${GITHUB_WORKSPACE}/../waypoint"
+          rm -f ~/.ssh/waypoint_deploy
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go.mod
@@ -37,27 +52,47 @@ jobs:
           cache: pnpm
           cache-dependency-path: dashboard/pnpm-lock.yaml
       - run: sudo apt-get update && sudo apt-get install -y squashfs-tools
-      - uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3
-      - name: Set VERSION
-        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
       - name: Build dashboard panel
         run: cd dashboard && pnpm install --frozen-lockfile && pnpm build
       - name: Build .raw
         run: make -f build/Makefile raw VERSION="${VERSION}"
-      - name: Sign .raw (cosign keyless)
-        run: |
-          set -euo pipefail
-          cosign sign-blob --yes --new-bundle-format \
-            --bundle "dist/so100-${VERSION}.raw.cosign" \
-            "dist/so100-${VERSION}.raw"
       - name: Manifest
         run: |
           set -euo pipefail
           SHA="$(sha256sum "dist/so100-${VERSION}.raw" | cut -d' ' -f1)"
           (cd build && go run ./manifest -toml ../module.toml -version "${VERSION}" -sha256 "${SHA}") > dist/manifest.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: dist
+          path: |
+            dist/so100-*.raw
+            dist/manifest.json
+          if-no-files-found: error
+
+  # Holds the cosign OIDC identity and the writable release token; runs no
+  # third-party build code, only signs and publishes what `build` produced.
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write   # cosign keyless OIDC; the proxy pins this workflow's SAN
+    steps:
+      - uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: dist
+          path: dist
+      - name: Sign .raw (cosign keyless)
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          cosign sign-blob --yes --new-bundle-format \
+            --bundle "dist/so100-${VERSION}.raw.cosign" \
+            "dist/so100-${VERSION}.raw"
       - uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           files: |
-            dist/so100-${{ env.VERSION }}.raw
-            dist/so100-${{ env.VERSION }}.raw.cosign
+            dist/so100-*.raw
+            dist/so100-*.raw.cosign
             dist/manifest.json
