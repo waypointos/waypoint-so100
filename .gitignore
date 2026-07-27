@@ -5,3 +5,10 @@ dashboard/dist/
 **/.vite/
 dashboard/node_modules/
 node_modules/
+
+# Local credentials: the daemon and systemd unit consume creds.env / core.env,
+# and none of these must ever be committed.
+*.env
+*.pem
+*.key
+.npmrc
