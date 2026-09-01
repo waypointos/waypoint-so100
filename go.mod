@@ -4,11 +4,11 @@ go 1.25.0
 
 require (
 	github.com/BurntSushi/toml v1.6.0
-	github.com/nats-io/nats.go v1.52.0
-	github.com/stretchr/testify v1.11.1
+	github.com/nats-io/nats.go v1.53.1
+	github.com/stretchr/testify v1.12.1
 	github.com/waypointos/waypoint/protocol/gen/go v0.0.0
 	github.com/waypointos/waypoint/sdk v0.0.0
-	google.golang.org/protobuf v1.36.11
+	google.golang.org/protobuf v1.36.12
 )
 
 replace github.com/waypointos/waypoint/sdk => ../waypoint/sdk
