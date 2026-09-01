@@ -9,20 +9,20 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@bufbuild/protobuf": "^1.10.1",
-    "@react-three/drei": "^10.7.7",
-    "@react-three/fiber": "^9.6.1",
-    "lucide-react": "^1.14.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "three": "^0.184.0",
-    "urdf-loader": "^0.12.7"
+    "@bufbuild/protobuf": "^2.14.0",
+    "@react-three/drei": "^10.7.8",
+    "@react-three/fiber": "^9.7.0",
+    "lucide-react": "^1.31.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "three": "^0.185.1",
+    "urdf-loader": "^0.13.1"
   },
   "devDependencies": {
-    "@testing-library/jest-dom": "^6.6.3", "@testing-library/react": "^16.1.0",
-    "@types/node": "^22.10.2", "@types/react": "^19.0.0", "@types/react-dom": "^19.0.0",
-    "@types/three": "^0.184.1", "@vitejs/plugin-react": "^4.3.4",
-    "jsdom": "^25.0.1", "typescript": "~5.7.2", "vite": "^5.4.0",
-    "vite-plugin-css-injected-by-js": "^3.5.2", "vitest": "^2.1.8"
+    "@testing-library/jest-dom": "^7.0.1", "@testing-library/react": "^16.1.0",
+    "@types/node": "^26.2.0", "@types/react": "^19.2.18", "@types/react-dom": "^19.2.4",
+    "@types/three": "^0.185.4", "@vitejs/plugin-react": "^6.0.5",
+    "jsdom": "^30.0.1", "typescript": "~7.0.2", "vite": "^8.2.1",
+    "vite-plugin-css-injected-by-js": "^5.0.2", "vitest": "^4.1.10"
   }
 }
